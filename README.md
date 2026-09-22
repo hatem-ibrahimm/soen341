@@ -11,7 +11,7 @@
 
 # Team Members:
 1. Ariana Giami
-2.
+2. Mujdeh Hosein Ali 
 3.
 4.
 5.

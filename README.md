@@ -12,7 +12,7 @@ CareerConnect provides a centralized web-based platform that brings all related 
 # Team Members:
 1. Ariana Giami
 2. Mujdeh Hosein Ali 
-3.
+3. Cristina Isabel Cid
 4.
 5.
 6.

@@ -19,7 +19,9 @@ CareerConnect provides a centralized web-based platform that brings all related 
 
 
 # Technologies:
-
+Frontend: React
+Backend: python
+Database: SQL
 
 # Setup Instructions:
 

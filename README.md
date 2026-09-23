@@ -14,7 +14,7 @@ CareerConnect provides a centralized web-based platform that brings all related 
 2. Mujdeh Hosein Ali 
 3. Cristina Isabel Cid
 4. Parsa Dalirirad
-5.
+5. Alexi Galarneau
 6.
 
 

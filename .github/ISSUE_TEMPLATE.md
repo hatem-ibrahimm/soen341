@@ -1,42 +1,24 @@
----
-title: ""
-labels: ""
-assignees: ""
----
+## User story
 
-## Issue type
-
-Select one:
-
-- [ ] User story
-- [ ] Development task
-- [ ] Bug
-- [ ] Testing
-- [ ] Documentation
+As a **[type of user]**, I want **[feature or action]** so that **[benefit or reason]**.
 
 ## Description
 
-Clearly describe the work that needs to be completed.
+Describe the feature and explain what the user should be able to do.
 
-## User story
+## Acceptance criteria
 
-Complete this section only if this is a user story.
-
-As a **[type of user]**, I want **[feature or action]** so that **[benefit]**.
-
-## Tasks
-
-- [ ] 
-- [ ] 
-- [ ] 
+* [ ]
+* [ ]
+* [ ]
 
 ## Planning information
 
-- **Priority:** High / Medium / Low
-- **Estimate:** 1 / 2 / 3 / 5 / 8
-- **Target date:** YYYY-MM-DD
-- **Related issue:** #
+* **Priority:** High / Medium / Low
+* **Story points:** 1 / 2 / 3 / 4 / 5
+* **Sprint:**
+* **Dependencies:** None / #
 
 ## Additional notes
 
-
+Add mockups, references, restrictions, or other useful information.

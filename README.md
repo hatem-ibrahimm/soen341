@@ -25,7 +25,10 @@ CareerConnect provides a centralized web-based platform that brings all related 
 1. Clone the repository from GitHub with command git clone.
 2. Navigate to the project directory: cd soen341
 3. Frontend setup: Navigate to the frontend directory and install the required dependencies with command npm install.
-4. Backend Setup: Navigate to the backend directory and install the required Python dependencies.
+   - run: npm install
+   - then: npm run dev ( which creates a localhost)
+   - 
+5. Backend Setup: Navigate to the backend directory and install the required Python dependencies.
 
 ## Proposed Features:
 - User registration, authentication, and profile management.

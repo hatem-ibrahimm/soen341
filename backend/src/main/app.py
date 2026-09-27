@@ -1,17 +1,3 @@
-import os
-import re
-
-from flask import Flask, jsonify, request
-from flask_cors import CORS
-from werkzeug.security import generate_password_hash
-
-try:
-    import psycopg2
-    from psycopg2 import errors as pg_errors
-except ImportError:
-    psycopg2 = None
-    pg_errors = None
-
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 

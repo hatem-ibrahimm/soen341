@@ -28,7 +28,8 @@ ALTER TABLE "public"."profiles"
   ALTER COLUMN "id" DROP DEFAULT;
 
 ALTER TABLE "public"."profiles"
-  ALTER COLUMN "id" TYPE uuid USING "id"::uuid;
+  ALTER COLUMN "id" TYPE uuid
+  USING (lpad(to_hex("id"), 32, '0')::uuid);
 
 ALTER TABLE "public"."profiles"
   ALTER COLUMN "id" SET DEFAULT gen_random_uuid();
@@ -43,7 +44,8 @@ ALTER TABLE "public"."resumes"
   ALTER COLUMN "id" DROP DEFAULT;
 
 ALTER TABLE "public"."resumes"
-  ALTER COLUMN "id" TYPE uuid USING "id"::uuid;
+  ALTER COLUMN "id" TYPE uuid
+  USING (lpad(to_hex("id"), 32, '0')::uuid);
 
 ALTER TABLE "public"."resumes"
   ALTER COLUMN "id" SET DEFAULT gen_random_uuid();

@@ -58,6 +58,22 @@ def create_app(test_config=None):
 
         return psycopg2.connect(app.config["DATABASE_URL"])
 
+    def get_authenticated_user():
+        authorization = request.headers.get("Authorization", "")
+        if not authorization.startswith("Bearer "):
+            return None
+
+        access_token = authorization.removeprefix("Bearer ").strip()
+        if not access_token:
+            return None
+
+        try:
+            response = get_supabase().auth.get_user(access_token)
+        except Exception:
+            return None
+
+        return getattr(response, "user", None)
+
     # -------------------------
     # Home
     # -------------------------
@@ -108,6 +124,12 @@ def create_app(test_config=None):
                 {
                     "email": email,
                     "password": password,
+                    "options": {
+                        "data": {
+                            "first_name": str(payload.get("firstName", "")).strip(),
+                            "last_name": str(payload.get("lastName", "")).strip(),
+                        }
+                    },
                 }
             )
 
@@ -260,8 +282,114 @@ def create_app(test_config=None):
     # Profile Management - US-02
     # -------------------------
 
-    @app.post("/api/profiles")
-    def create_profile():
+    @app.get("/api/profiles/me")
+    def get_profile():
+        user = get_authenticated_user()
+        if user is None:
+            return jsonify({"error": "Authentication required."}), 401
+
+        connection = None
+        cursor = None
+
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+            cursor.execute(
+                """
+                SELECT id, first_name, last_name, email, title,
+                    phone_number, location, bio, created_at
+                FROM profiles
+                WHERE id = %s
+                """,
+                (str(user.id),),
+            )
+            profile = cursor.fetchone()
+
+            if profile is None:
+                return jsonify({"error": "Profile not found."}), 404
+
+            cursor.execute(
+                """
+                SELECT job_title, company, dates, description
+                FROM work_experiences
+                WHERE user_id = %s
+                ORDER BY display_order, created_at
+                """,
+                (str(user.id),),
+            )
+            experiences = cursor.fetchall()
+            cursor.execute(
+                """
+                SELECT school, degree, years
+                FROM education
+                WHERE user_id = %s
+                ORDER BY display_order, created_at
+                """,
+                (str(user.id),),
+            )
+            education = cursor.fetchall()
+            cursor.execute(
+                """
+                SELECT name
+                FROM skills
+                WHERE user_id = %s
+                ORDER BY created_at
+                """,
+                (str(user.id),),
+            )
+            skills = cursor.fetchall()
+
+            return jsonify(
+                {
+                    "profile": {
+                        "id": str(profile[0]),
+                        "first_name": profile[1],
+                        "last_name": profile[2],
+                        "email": profile[3],
+                        "title": profile[4],
+                        "phone_number": profile[5],
+                        "location": profile[6],
+                        "bio": profile[7],
+                        "created_at": profile[8],
+                        "experiences": [
+                            {
+                                "title": experience[0],
+                                "company": experience[1],
+                                "dates": experience[2],
+                                "description": experience[3],
+                            }
+                            for experience in experiences
+                        ],
+                        "education": [
+                            {
+                                "school": item[0],
+                                "degree": item[1],
+                                "years": item[2],
+                            }
+                            for item in education
+                        ],
+                        "skills": [item[0] for item in skills],
+                    }
+                }
+            ), 200
+
+        except Exception:
+            app.logger.exception("Profile retrieval failed")
+            return jsonify(
+                {"error": "Unable to retrieve profile at this time."}
+            ), 500
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if connection is not None:
+                connection.close()
+
+    @app.put("/api/profiles/me")
+    def save_profile():
+        user = get_authenticated_user()
+        if user is None:
+            return jsonify({"error": "Authentication required."}), 401
+
         payload = request.get_json(silent=True)
 
         if not isinstance(payload, dict):
@@ -269,10 +397,36 @@ def create_app(test_config=None):
                 {"error": "Request body must be valid JSON."}
             ), 400
 
+        list_fields = ("experiences", "education", "skills")
+        for field in list_fields:
+            if field in payload and not isinstance(payload[field], list):
+                return jsonify({"error": f"{field} must be a list."}), 400
+        if any(
+            not isinstance(item, dict)
+            for field in ("experiences", "education")
+            for item in payload.get(field, [])
+        ):
+            return jsonify(
+                {"error": "Experience and education entries must be objects."}
+            ), 400
+        if any(
+            not isinstance(skill, str) or not skill.strip()
+            for skill in payload.get("skills", [])
+        ):
+            return jsonify(
+                {"error": "Skills must contain non-empty strings."}
+            ), 400
+        normalized_skills = [
+            skill.strip().lower() for skill in payload.get("skills", [])
+        ]
+        if len(normalized_skills) != len(set(normalized_skills)):
+            return jsonify({"error": "Skills must not contain duplicates."}), 400
+
         required_fields = [
             "first_name",
             "last_name",
             "email",
+            "title",
             "phone_number",
             "location",
             "bio",
@@ -287,6 +441,7 @@ def create_app(test_config=None):
         first_name = str(payload["first_name"]).strip()
         last_name = str(payload["last_name"]).strip()
         email = str(payload["email"]).strip().lower()
+        title = str(payload["title"]).strip()
         phone_number = str(payload["phone_number"]).strip()
         location = str(payload["location"]).strip()
         bio = str(payload["bio"]).strip()
@@ -302,29 +457,43 @@ def create_app(test_config=None):
                 """
                 INSERT INTO profiles
                     (
+                        id,
                         first_name,
                         last_name,
                         email,
+                        title,
                         phone_number,
                         location,
                         bio
                     )
                 VALUES
-                    (%s, %s, %s, %s, %s, %s)
+                    (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO UPDATE
+                SET
+                    first_name = EXCLUDED.first_name,
+                    last_name = EXCLUDED.last_name,
+                    email = EXCLUDED.email,
+                    title = EXCLUDED.title,
+                    phone_number = EXCLUDED.phone_number,
+                    location = EXCLUDED.location,
+                    bio = EXCLUDED.bio
                 RETURNING
                     id,
                     first_name,
                     last_name,
                     email,
+                    title,
                     phone_number,
                     location,
                     bio,
                     created_at
                 """,
                 (
+                    str(user.id),
                     first_name,
                     last_name,
                     email,
+                    title,
                     phone_number,
                     location,
                     bio,
@@ -332,201 +501,79 @@ def create_app(test_config=None):
             )
 
             profile = cursor.fetchone()
+            user_id = str(user.id)
+
+            cursor.execute(
+                "DELETE FROM work_experiences WHERE user_id = %s",
+                (user_id,),
+            )
+            for index, experience in enumerate(payload.get("experiences", [])):
+                cursor.execute(
+                    """
+                    INSERT INTO work_experiences
+                        (user_id, job_title, company, dates, description, display_order)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    """,
+                    (
+                        user_id,
+                        str(experience.get("title", "")).strip(),
+                        str(experience.get("company", "")).strip(),
+                        str(experience.get("dates", "")).strip(),
+                        str(experience.get("description", "")).strip(),
+                        index,
+                    ),
+                )
+
+            cursor.execute("DELETE FROM education WHERE user_id = %s", (user_id,))
+            for index, item in enumerate(payload.get("education", [])):
+                cursor.execute(
+                    """
+                    INSERT INTO education (user_id, school, degree, years, display_order)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (
+                        user_id,
+                        str(item.get("school", "")).strip(),
+                        str(item.get("degree", "")).strip(),
+                        str(item.get("years", "")).strip(),
+                        index,
+                    ),
+                )
+
+            cursor.execute("DELETE FROM skills WHERE user_id = %s", (user_id,))
+            for skill in payload.get("skills", []):
+                cursor.execute(
+                    "INSERT INTO skills (user_id, name) VALUES (%s, %s)",
+                    (user_id, skill.strip()),
+                )
+
             connection.commit()
 
             return jsonify(
                 {
-                    "message": "Profile created successfully.",
+                    "message": "Profile saved successfully.",
                     "profile": {
-                        "id": profile[0],
+                        "id": str(profile[0]),
                         "first_name": profile[1],
                         "last_name": profile[2],
                         "email": profile[3],
-                        "phone_number": profile[4],
-                        "location": profile[5],
-                        "bio": profile[6],
-                        "created_at": profile[7],
+                        "title": profile[4],
+                        "phone_number": profile[5],
+                        "location": profile[6],
+                        "bio": profile[7],
+                        "created_at": profile[8],
                     },
                 }
-            ), 201
+            ), 200
 
         except Exception:
             if connection is not None:
                 connection.rollback()
 
-            app.logger.exception("Profile creation failed")
+            app.logger.exception("Profile save failed")
 
             return jsonify(
                 {"error": "Unable to create profile at this time."}
-            ), 500
-
-        finally:
-            if cursor is not None:
-                cursor.close()
-
-            if connection is not None:
-                connection.close()
-
-    @app.get("/api/profiles/<int:profile_id>")
-    def get_profile(profile_id):
-        connection = None
-        cursor = None
-
-        try:
-            connection = get_connection()
-            cursor = connection.cursor()
-
-            cursor.execute(
-                """
-                SELECT id, first_name, last_name, email,
-                    phone_number, location, bio, created_at
-                FROM profiles
-                WHERE id = %s
-                """,
-                (profile_id,),
-            )
-
-            profile = cursor.fetchone()
-
-            if profile is None:
-                return jsonify(
-                    {"error": "Profile not found."}
-                ), 404
-
-            return jsonify(
-                {
-                    "profile": {
-                        "id": profile[0],
-                        "first_name": profile[1],
-                        "last_name": profile[2],
-                        "email": profile[3],
-                        "phone_number": profile[4],
-                        "location": profile[5],
-                        "bio": profile[6],
-                        "created_at": profile[7],
-                    }
-                }
-            ), 200
-
-        except Exception:
-            app.logger.exception("Profile retrieval failed")
-
-            return jsonify(
-                {"error": "Unable to retrieve profile at this time."}
-            ), 500
-
-        finally:
-            if cursor is not None:
-                cursor.close()
-
-            if connection is not None:
-                connection.close()
-
-    @app.put("/api/profiles/<int:profile_id>")
-    def update_profile(profile_id):
-        payload = request.get_json(silent=True)
-
-        if not isinstance(payload, dict):
-            return jsonify(
-                {"error": "Request body must be valid JSON."}
-            ), 400
-
-        required_fields = [
-            "first_name",
-            "last_name",
-            "email",
-            "phone_number",
-            "location",
-            "bio",
-        ]
-
-        for field in required_fields:
-            if not str(payload.get(field, "")).strip():
-                return jsonify(
-                    {"error": f"{field} is required."}
-                ), 400
-
-        first_name = str(payload["first_name"]).strip()
-        last_name = str(payload["last_name"]).strip()
-        email = str(payload["email"]).strip().lower()
-        phone_number = str(payload["phone_number"]).strip()
-        location = str(payload["location"]).strip()
-        bio = str(payload["bio"]).strip()
-
-        connection = None
-        cursor = None
-
-        try:
-            connection = get_connection()
-            cursor = connection.cursor()
-
-            cursor.execute(
-                """
-                UPDATE profiles
-                SET
-                    first_name = %s,
-                    last_name = %s,
-                    email = %s,
-                    phone_number = %s,
-                    location = %s,
-                    bio = %s
-                WHERE id = %s
-                RETURNING
-                    id,
-                    first_name,
-                    last_name,
-                    email,
-                    phone_number,
-                    location,
-                    bio,
-                    created_at
-                """,
-                (
-                    first_name,
-                    last_name,
-                    email,
-                    phone_number,
-                    location,
-                    bio,
-                    profile_id,
-                ),
-            )
-
-            profile = cursor.fetchone()
-
-            if profile is None:
-                connection.rollback()
-
-                return jsonify(
-                    {"error": "Profile not found."}
-                ), 404
-
-            connection.commit()
-
-            return jsonify(
-                {
-                    "message": "Profile updated successfully.",
-                    "profile": {
-                        "id": profile[0],
-                        "first_name": profile[1],
-                        "last_name": profile[2],
-                        "email": profile[3],
-                        "phone_number": profile[4],
-                        "location": profile[5],
-                        "bio": profile[6],
-                        "created_at": profile[7],
-                    },
-                }
-            ), 200
-
-        except Exception:
-            if connection is not None:
-                connection.rollback()
-
-            app.logger.exception("Profile update failed")
-
-            return jsonify(
-                {"error": "Unable to update profile at this time."}
             ), 500
 
         finally:

@@ -1,15 +1,18 @@
-const apiBaseUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(
-    /\/+$/,
-    '',
-)
+const apiBaseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '')
 
-async function post(path, body) {
+async function request(path, { method = 'GET', body } = {}) {
     let response
+    const token = window.localStorage.getItem('token')
     try {
         response = await fetch(`${apiBaseUrl}${path}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+            method,
+            headers: {
+                ...(body ? { 'Content-Type': 'application/json' } : {}),
+                ...(token
+                    ? { Authorization: 'Bearer ' + token }
+                    : {}),
+            },
+            body: body ? JSON.stringify(body) : undefined,
         })
     } catch {
         throw new Error('Unable to reach the server. Please try again later.')
@@ -44,9 +47,17 @@ async function post(path, body) {
 }
 
 export function register(user) {
-    return post('/api/auth/register', user)
+    return request('/api/auth/register', { method: 'POST', body: user })
 }
 
 export function login(credentials) {
-    return post('/api/auth/login', credentials)
+    return request('/api/auth/login', { method: 'POST', body: credentials })
+}
+
+export function getProfile() {
+    return request('/api/profiles/me')
+}
+
+export function saveProfile(profile) {
+    return request('/api/profiles/me', { method: 'PUT', body: profile })
 }

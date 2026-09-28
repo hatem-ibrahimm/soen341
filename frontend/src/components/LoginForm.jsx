@@ -1,18 +1,17 @@
 import { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { login } from '../services/authApi.js'
 import './LoginForm.css'
 
 function LoginForm() {
     const [error, setError] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
-    const [success, setSuccess] = useState('')
     const location = useLocation()
+    const navigate = useNavigate()
 
     async function handleSubmit(event) {
         event.preventDefault()
         setError('')
-        setSuccess('')
         setIsSubmitting(true)
 
         const formData = new FormData(event.currentTarget)
@@ -21,7 +20,10 @@ function LoginForm() {
                 email: formData.get('email').trim(),
                 password: formData.get('password'),
             })
-            const token = response.token ?? response.access_token
+            const token =
+                response.token ??
+                response.access_token ??
+                response.session?.access_token
             if (typeof token !== 'string' || !token) {
                 throw new Error(
                     'Login succeeded, but the server did not return an authentication token.',
@@ -29,7 +31,10 @@ function LoginForm() {
             }
 
             window.localStorage.setItem('token', token)
-            setSuccess('You are now logged in.')
+            if (typeof response.user?.id === 'string') {
+                window.localStorage.setItem('userId', response.user.id)
+            }
+            navigate('/', { replace: true })
         } catch (requestError) {
             setError(requestError.message)
         } finally {
@@ -41,9 +46,9 @@ function LoginForm() {
         <main className="auth-page">
             <section className="auth-card" aria-labelledby="login-heading">
                 <h1 id="login-heading">Log in</h1>
-                {(location.state?.message || success) && (
+                {location.state?.message && (
                     <p className="auth-success" role="status">
-                        {success || location.state.message}
+                        {location.state.message}
                     </p>
                 )}
                 <form onSubmit={handleSubmit}>

@@ -1,75 +1,81 @@
-import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { getProfile, saveProfile } from "../services/authApi.js";
+import React, { useState, useEffect } from "react";
 import "./ProfileManagement.css";
 
+// address of the Flask backend (app.py runs on port 5000)
+const API_URL = "http://127.0.0.1:5000";
+
 function ProfileManagement() {
+  // saved by the login page after a successful login
+  const userId = localStorage.getItem("userId");
+  const token = localStorage.getItem("accessToken");
+
   // Keeps track of the selected tab, clicking a tab changes it and the right side updates
   const [activeTab, setActiveTab] = useState("personal");
 
   // true = show the "Saved" message for a few seconds after the user clicks Save
   const [saved, setSaved] = useState(false);
-  const [saveError, setSaveError] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(() => Boolean(window.localStorage.getItem("token")));
 
-  // Sample data
+  // true while the profile is being loaded from the backend
+  const [loading, setLoading] = useState(true);
+
+  // error message to show the user (empty = no error)
+  const [error, setError] = useState("");
+
+  // starts empty, filled in from the backend when the page opens
+  // key names match the backend/database so we can send it as-is
   const [profile, setProfile] = useState({
-    firstName: "Ace",
-    lastName: "Newton",
-    title: "Software Developer",
-    email: "ace.newton@gmail.com",
-    phone: "(514) 121-3489",
-    location: "Montreal, QC",
-    about: "",
+    first_name: "",
+    last_name: "",
+    title: "",
+    email: "",
+    phone_number: "",
+    location: "",
+    bio: "",
   });
 
-  const [experiences, setExperiences] = useState([
-    {
-      title: "Software Engineering Intern",
-      company: "Manulife",
-      dates: "September 2025 - December 2025",
-      description: "Developed and maintained software features using modern programming languages and tools",
-    },
-  ]);
-
-  const [education, setEducation] = useState([
-    { school: "Concordia University", degree: "B.Eng. Software Engineering", years: "2023 - 2027" },
-  ]);
-
-  const [skills, setSkills] = useState(["C++", "Python", "JavaScript"]);
+  // experience, education and skills are not saved to the backend yet (next sprint)
+  const [experiences, setExperiences] = useState([]);
+  const [education, setEducation] = useState([]);
+  const [skills, setSkills] = useState([]);
   const [newSkill, setNewSkill] = useState("");
 
+
+
+  // Load the profile once when the page opens
   useEffect(() => {
-    if (!window.localStorage.getItem("token")) return;
-
-    let isCurrent = true;
-    getProfile()
-      .then(({ profile: savedProfile }) => {
-        if (!isCurrent) return;
-        setProfile({
-          firstName: savedProfile.first_name || "",
-          lastName: savedProfile.last_name || "",
-          title: savedProfile.title || "",
-          email: savedProfile.email || "",
-          phone: savedProfile.phone_number || "",
-          location: savedProfile.location || "",
-          about: savedProfile.bio || "",
+    async function loadProfile() {
+      try {
+        const response = await fetch(`${API_URL}/api/profiles/${userId}`, {
+          headers: { Authorization: `Bearer ${token}` },
         });
-        setExperiences(savedProfile.experiences || []);
-        setEducation(savedProfile.education || []);
-        setSkills(savedProfile.skills || []);
-      })
-      .catch((error) => {
-        if (isCurrent) setSaveError(error.message);
-      })
-      .finally(() => {
-        if (isCurrent) setIsLoading(false);
-      });
+        const data = await response.json();
 
-    return () => {
-      isCurrent = false;
-    };
+        if (!response.ok) {
+          setError(data.error || "Could not load your profile.");
+          return;
+        }
+
+        // the database can have empty (null) fields, so use "" instead
+        const p = data.profile;
+        setProfile({
+          first_name: p.first_name || "",
+          last_name: p.last_name || "",
+          title: p.title || "",
+          email: p.email || "",
+          phone_number: p.phone_number || "",
+          location: p.location || "",
+          bio: p.bio || "",
+        });
+      } catch {
+        setError("Could not reach the server. Is the backend running?");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (userId) {
+      loadProfile();
+    }
   }, []);
 
 
@@ -119,10 +125,7 @@ function ProfileManagement() {
   // Skills
   function addSkill(e) {
     e.preventDefault();  // stops the page from refreshing
-    if (
-      newSkill.trim() === "" ||
-      skills.some((skill) => skill.toLowerCase() === newSkill.trim().toLowerCase())
-    ) return;
+    if (newSkill.trim() === "") return;
     setSkills([...skills, newSkill.trim()]);
     setNewSkill("");
   }
@@ -133,46 +136,30 @@ function ProfileManagement() {
 
 
 
-  // Save 
+  // Save: send the personal info to the backend
   async function handleSave() {
-    setSaved(false);
-    setSaveError("");
-    const payload = {
-      first_name: profile.firstName,
-      last_name: profile.lastName,
-      title: profile.title,
-      email: profile.email,
-      phone_number: profile.phone,
-      location: profile.location,
-      bio: profile.about,
-      experiences: experiences.map((experience) => ({
-        title: experience.title,
-        company: experience.company,
-        dates: experience.dates,
-        description: experience.description,
-      })),
-      education: education.map((item) => ({
-        school: item.school,
-        degree: item.degree,
-        years: item.years,
-      })),
-      skills,
-    };
+    setError("");
 
-    if (Object.values(payload).some((value) => !value.trim())) {
-      setSaveError("Please complete all personal information fields before saving.");
-      return;
-    }
-
-    setIsSaving(true);
     try {
-      await saveProfile(payload);
+      const response = await fetch(`${API_URL}/api/profiles/${userId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(profile),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Could not save your profile.");
+        return;
+      }
+
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch (error) {
-      setSaveError(error.message);
-    } finally {
-      setIsSaving(false);
+    } catch {
+      setError("Could not reach the server. Is the backend running?");
     }
   }
 
@@ -184,24 +171,42 @@ function ProfileManagement() {
     
   ];
 
+  // not logged in: nothing to load
+  if (!userId) {
+    return (
+      <div className="page">
+        <p>
+          Please <a href="/login">log in</a> to see your profile.
+        </p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="page">
+        <p>Loading your profile...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       {/* Top bar */}
       <div className="appbar">
         <span className="logo-mark"></span>
-        <Link className="logo" to="/">CareerConnect</Link>
-        <Link className="profile-home-link" to="/">Home</Link>
+        <span className="logo">CareerConnect</span>
       </div>
 
       {/* Profile card with initials */}
       <div className="summary">
         <div className="avatar">
-          {profile.firstName.charAt(0)}
-          {profile.lastName.charAt(0)}
+          {profile.first_name.charAt(0)}
+          {profile.last_name.charAt(0)}
         </div>
         <div>
           <h1>
-            {profile.firstName} {profile.lastName}
+            {profile.first_name} {profile.last_name}
           </h1>
           <p className="title">{profile.title}</p>
           <p className="muted">{profile.location}</p>
@@ -230,11 +235,11 @@ function ProfileManagement() {
               <div className="grid">
                 <label className="field">
                   First name
-                  <input name="firstName" value={profile.firstName} onChange={handleProfileChange} />
+                  <input name="first_name" value={profile.first_name} onChange={handleProfileChange} />
                 </label>
                 <label className="field">
                   Last name
-                  <input name="lastName" value={profile.lastName} onChange={handleProfileChange} />
+                  <input name="last_name" value={profile.last_name} onChange={handleProfileChange} />
                 </label>
                 <label className="field full">
                   Title
@@ -246,7 +251,7 @@ function ProfileManagement() {
                 </label>
                 <label className="field">
                   Phone
-                  <input name="phone" value={profile.phone} onChange={handleProfileChange} />
+                  <input name="phone_number" value={profile.phone_number} onChange={handleProfileChange} />
                 </label>
                 <label className="field full">
                   Location
@@ -254,7 +259,7 @@ function ProfileManagement() {
                 </label>
                 <label className="field full">
                   About
-                  <textarea name="about" rows="4" value={profile.about} onChange={handleProfileChange} />
+                  <textarea name="bio" rows="4" value={profile.bio} onChange={handleProfileChange} />
                 </label>
               </div>
             </div>
@@ -367,12 +372,11 @@ function ProfileManagement() {
 
           {/* One Save button shared by every tab */}
           <div className="save-row">
-            {isLoading && <span className="profile-status" role="status">Loading profile…</span>}
-            {saveError && <span className="profile-error" role="alert">{saveError}</span>}
-            <button className="btn-primary" onClick={handleSave} disabled={isSaving || isLoading}>
-              {isSaving ? "Saving…" : "Save changes"}
+            <button className="btn-primary" onClick={handleSave}>
+              Save changes
             </button>
             {saved && <span className="saved">Saved</span>}
+            {error && <span className="error">{error}</span>}
           </div>
         </div>
       </div>

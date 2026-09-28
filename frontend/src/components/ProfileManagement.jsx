@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { getProfile, saveProfile } from "../services/authApi.js";
 import "./ProfileManagement.css";
 
 function ProfileManagement() {
@@ -7,6 +9,9 @@ function ProfileManagement() {
 
   // true = show the "Saved" message for a few seconds after the user clicks Save
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(() => Boolean(window.localStorage.getItem("token")));
 
   // Sample data
   const [profile, setProfile] = useState({
@@ -34,6 +39,38 @@ function ProfileManagement() {
 
   const [skills, setSkills] = useState(["C++", "Python", "JavaScript"]);
   const [newSkill, setNewSkill] = useState("");
+
+  useEffect(() => {
+    if (!window.localStorage.getItem("token")) return;
+
+    let isCurrent = true;
+    getProfile()
+      .then(({ profile: savedProfile }) => {
+        if (!isCurrent) return;
+        setProfile({
+          firstName: savedProfile.first_name || "",
+          lastName: savedProfile.last_name || "",
+          title: savedProfile.title || "",
+          email: savedProfile.email || "",
+          phone: savedProfile.phone_number || "",
+          location: savedProfile.location || "",
+          about: savedProfile.bio || "",
+        });
+        setExperiences(savedProfile.experiences || []);
+        setEducation(savedProfile.education || []);
+        setSkills(savedProfile.skills || []);
+      })
+      .catch((error) => {
+        if (isCurrent) setSaveError(error.message);
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
 
 
@@ -82,7 +119,10 @@ function ProfileManagement() {
   // Skills
   function addSkill(e) {
     e.preventDefault();  // stops the page from refreshing
-    if (newSkill.trim() === "") return;
+    if (
+      newSkill.trim() === "" ||
+      skills.some((skill) => skill.toLowerCase() === newSkill.trim().toLowerCase())
+    ) return;
     setSkills([...skills, newSkill.trim()]);
     setNewSkill("");
   }
@@ -94,9 +134,46 @@ function ProfileManagement() {
 
 
   // Save 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  async function handleSave() {
+    setSaved(false);
+    setSaveError("");
+    const payload = {
+      first_name: profile.firstName,
+      last_name: profile.lastName,
+      title: profile.title,
+      email: profile.email,
+      phone_number: profile.phone,
+      location: profile.location,
+      bio: profile.about,
+      experiences: experiences.map((experience) => ({
+        title: experience.title,
+        company: experience.company,
+        dates: experience.dates,
+        description: experience.description,
+      })),
+      education: education.map((item) => ({
+        school: item.school,
+        degree: item.degree,
+        years: item.years,
+      })),
+      skills,
+    };
+
+    if (Object.values(payload).some((value) => !value.trim())) {
+      setSaveError("Please complete all personal information fields before saving.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await saveProfile(payload);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (error) {
+      setSaveError(error.message);
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   const tabs = [
@@ -112,7 +189,8 @@ function ProfileManagement() {
       {/* Top bar */}
       <div className="appbar">
         <span className="logo-mark"></span>
-        <span className="logo">CareerConnect</span>
+        <Link className="logo" to="/">CareerConnect</Link>
+        <Link className="profile-home-link" to="/">Home</Link>
       </div>
 
       {/* Profile card with initials */}
@@ -289,8 +367,10 @@ function ProfileManagement() {
 
           {/* One Save button shared by every tab */}
           <div className="save-row">
-            <button className="btn-primary" onClick={handleSave}>
-              Save changes
+            {isLoading && <span className="profile-status" role="status">Loading profile…</span>}
+            {saveError && <span className="profile-error" role="alert">{saveError}</span>}
+            <button className="btn-primary" onClick={handleSave} disabled={isSaving || isLoading}>
+              {isSaving ? "Saving…" : "Save changes"}
             </button>
             {saved && <span className="saved">Saved</span>}
           </div>

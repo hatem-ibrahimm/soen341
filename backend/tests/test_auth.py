@@ -47,6 +47,12 @@ class AuthApiTests(unittest.TestCase):
             {
                 "email": "parsa@example.com",
                 "password": "StrongPass123",
+                "options": {
+                    "data": {
+                        "first_name": "",
+                        "last_name": "",
+                    }
+                },
             }
         )
         self.assertEqual(response.get_json()["user"]["email"], "parsa@example.com")

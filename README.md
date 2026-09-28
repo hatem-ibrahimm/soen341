@@ -38,4 +38,4 @@ CareerConnect provides a centralized web-based platform that brings all related 
 - Notifications and reminders for application deadlines.
 - Saved jobs and favourites.
 - AI-assisted resume feedback or job matching suggestions.
-- (Our additional original feature.)
+- Setting a minimum acceptable salary so that jobs below this salary are clearly marked.

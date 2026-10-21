@@ -1,0 +1,35 @@
+﻿Task ID/Title: Front end setup
+
+Purpose of AI Use: AI was used to brainstorm different solutions of implementation for the front end and the structure it will have
+
+Why AI was used: Since it was my first time using any of these front end API and dependencies AI helped me decide which one was the best for my use case
+
+Chat Link or Prompt/Response: Link to the conversation or the full prompt and AI response.
+
+AI-Suggested Content: Since we already knew we were going to use react, the AI suggested to pair it with “vite” and “Axios” two javascript libraries. Then it also explained how to implement them.
+
+Validation: How the output was verified: The output was manually reviewed by Alexi 
+
+Decision: Modified before use
+
+Reflection: Honestly I realized how complicated all of this can get and quickly especially with how many choices there are and how not all systems are the same. Since I don't have too much knowledge in these subjects, I think the AI did assist me well.
+
+Responsible Person: Alexi
+
+Task ID/Title: Front end CSS styling
+
+Purpose of AI Use: AI was used to produce a simple layout design for the sign in page and register page
+
+Why AI was used: CSS style can easily be changed to the design style we want later so i just wanted a placeholder for in the meantime
+
+Chat Link or Prompt/Response: The AI prompt was "Create a CSS template for the frontend login page and register page"
+
+AI-Suggested Content: The AI suggested: VIEW LoginForm.css and RegistrationForm.css
+
+Validation: How the output was verified: The output was manually reviewed by Alexi and then tested the fonctionnality in a localhost in browser
+
+Decision: Accepted
+
+Reflection: CSS styling was not the priority for the front end in this sprint. The focus was pplaced on properly setting up the env needed and linking it to the back end.
+
+Responsible Person: Alexi

@@ -1,0 +1,162 @@
+.home-page {
+    min-height: 100vh;
+    padding: 1.5rem clamp(1.25rem, 6vw, 6rem) 4rem;
+    background: #f5f7fb;
+    color: #172033;
+    font-family: system-ui, sans-serif;
+}
+
+.home-header {
+    max-width: 72rem;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.home-brand,
+.home-nav a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.home-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    font-size: 1.1rem;
+    font-weight: 750;
+}
+
+.home-brand-mark {
+    width: 1.8rem;
+    height: 1.8rem;
+    border-radius: 0.55rem;
+    background: #2449b5;
+}
+
+.home-nav {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    font-size: 0.95rem;
+    font-weight: 650;
+}
+
+.home-nav-primary {
+    padding: 0.65rem 1rem;
+    border-radius: 0.45rem;
+    background: #2449b5;
+    color: #fff !important;
+}
+
+.home-hero {
+    max-width: 52rem;
+    margin: clamp(4rem, 12vh, 8rem) auto 5rem;
+    text-align: center;
+}
+
+.home-eyebrow {
+    margin: 0 0 1rem;
+    color: #2449b5;
+    font-size: 0.85rem;
+    font-weight: 750;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.home-hero h1 {
+    margin: 0;
+    font-size: clamp(2.5rem, 7vw, 4.6rem);
+    line-height: 1.08;
+    letter-spacing: -0.055em;
+}
+
+.home-description {
+    max-width: 38rem;
+    margin: 1.4rem auto 0;
+    color: #5d6677;
+    font-size: 1.1rem;
+    line-height: 1.7;
+}
+
+.home-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.8rem;
+    margin-top: 2rem;
+}
+
+.home-button {
+    padding: 0.85rem 1.2rem;
+    border: 1px solid transparent;
+    border-radius: 0.45rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.home-button-primary {
+    background: #2449b5;
+    color: #fff;
+}
+
+.home-button-secondary {
+    border-color: #d5dbe6;
+    background: #fff;
+    color: #172033;
+}
+
+.home-feature {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 1.5rem;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 1.25rem;
+    border: 1px solid #e1e6ef;
+    border-radius: 0.8rem;
+    background: #fff;
+    box-shadow: 0 0.75rem 2rem rgb(23 32 51 / 5%);
+}
+
+.home-feature-icon {
+    width: 3rem;
+    height: 3rem;
+    display: grid;
+    place-items: center;
+    border-radius: 0.7rem;
+    background: #eaf0ff;
+    color: #2449b5;
+    font-size: 1.4rem;
+}
+
+.home-feature h2 {
+    margin: 0 0 0.35rem;
+    font-size: 1.05rem;
+}
+
+.home-feature p {
+    margin: 0;
+    color: #687386;
+    line-height: 1.5;
+}
+
+.home-feature > a {
+    color: #2449b5;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+    .home-feature {
+        grid-template-columns: auto 1fr;
+    }
+
+    .home-feature > a {
+        grid-column: 2;
+    }
+}

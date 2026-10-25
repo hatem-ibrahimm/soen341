@@ -54,10 +54,13 @@ export function login(credentials) {
     return request('/api/auth/login', { method: 'POST', body: credentials })
 }
 
-export function getProfile() {
-    return request('/api/profiles/me')
+export function getProfile(profileId) {
+    return request(`/api/profiles/${encodeURIComponent(profileId)}`)
 }
 
-export function saveProfile(profile) {
-    return request('/api/profiles/me', { method: 'PUT', body: profile })
+export function saveProfile(profileId, profile) {
+    return request(`/api/profiles/${encodeURIComponent(profileId)}`, {
+        method: 'PUT',
+        body: profile,
+    })
 }

@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from "react";
 import "./ProfileManagement.css";
 
-// address of the Flask backend (app.py runs on port 5000)
-const API_URL = "http://127.0.0.1:5000";
+import { getProfile, saveProfile } from "../services/authApi.js";
 
 function ProfileManagement() {
   // saved by the login page after a successful login
   const userId = localStorage.getItem("userId");
-  const token = localStorage.getItem("accessToken");
+  const token = localStorage.getItem("token");
 
   // Keeps track of the selected tab, clicking a tab changes it and the right side updates
   const [activeTab, setActiveTab] = useState("personal");
@@ -43,20 +42,23 @@ function ProfileManagement() {
 
   // Load the profile once when the page opens
   useEffect(() => {
-    async function loadProfile() {
-      try {
-        const response = await fetch(`${API_URL}/api/profiles/${userId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await response.json();
+    let ignore = false;
 
-        if (!response.ok) {
-          setError(data.error || "Could not load your profile.");
-          return;
+    async function loadProfile() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const data = await getProfile();
+
+        if (!data.profile) {
+          throw new Error("The server did not return your profile.");
         }
 
-        // the database can have empty (null) fields, so use "" instead
+        if (ignore) return;
+
         const p = data.profile;
+
         setProfile({
           first_name: p.first_name || "",
           last_name: p.last_name || "",
@@ -66,17 +68,29 @@ function ProfileManagement() {
           location: p.location || "",
           bio: p.bio || "",
         });
-      } catch {
-        setError("Could not reach the server. Is the backend running?");
+      } catch (requestError) {
+        if (!ignore) {
+          setError(
+              requestError.message || "Could not load your profile."
+          );
+        }
       } finally {
-        setLoading(false);
+        if (!ignore) {
+          setLoading(false);
+        }
       }
     }
 
-    if (userId) {
+    if (userId && token) {
       loadProfile();
+    } else {
+      setLoading(false);
     }
-  }, []);
+
+    return () => {
+      ignore = true;
+    };
+  }, [userId, token]);
 
 
 
@@ -139,27 +153,17 @@ function ProfileManagement() {
   // Save: send the personal info to the backend
   async function handleSave() {
     setError("");
+    setSaved(false);
 
     try {
-      const response = await fetch(`${API_URL}/api/profiles/${userId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(profile),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || "Could not save your profile.");
-        return;
-      }
+      await saveProfile(profile);
 
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch {
-      setError("Could not reach the server. Is the backend running?");
+    } catch (requestError) {
+      setError(
+          requestError.message || "Could not save your profile."
+      );
     }
   }
 
@@ -172,7 +176,7 @@ function ProfileManagement() {
   ];
 
   // not logged in: nothing to load
-  if (!userId) {
+  if (!userId || !token) {
     return (
       <div className="page">
         <p>
@@ -372,11 +376,32 @@ function ProfileManagement() {
 
           {/* One Save button shared by every tab */}
           <div className="save-row">
-            <button className="btn-primary" onClick={handleSave}>
-              Save changes
-            </button>
-            {saved && <span className="saved">Saved</span>}
-            {error && <span className="error">{error}</span>}
+            {activeTab === "personal" ? (
+                <>
+                  <button
+                      className="btn-primary"
+                      onClick={handleSave}
+                      disabled={!userId || !token}
+                  >
+                    Save personal information
+                  </button>
+
+                  {saved && (
+                      <span className="saved" role="status">
+                        Personal information saved
+                      </span>
+                  )}
+                </>
+            ) : (
+                <p className="muted" role="status">
+                  Changes in this section are temporary and are not saved yet.
+                </p>
+            )}
+              {error && (
+                <span className="error" role="alert">
+                  {error}
+                </span>
+            )}
           </div>
         </div>
       </div>

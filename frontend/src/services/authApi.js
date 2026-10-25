@@ -47,17 +47,41 @@ async function request(path, { method = 'GET', body } = {}) {
 }
 
 export function register(user) {
-    return request('/api/auth/register', { method: 'POST', body: user })
+    return request('/api/auth/register', {
+        method: 'POST',
+        body: {
+            email: user.email,
+            password: user.password,
+            firstName: user.firstName,
+            lastName: user.lastName,
+        },
+    })
+}
+
+function getStoredProfileId() {
+    const userId = window.localStorage.getItem('userId')
+
+    if (!userId) {
+        throw new Error('Please log in to access your profile.')
+    }
+
+    return encodeURIComponent(userId)
 }
 
 export function login(credentials) {
-    return request('/api/auth/login', { method: 'POST', body: credentials })
+    return request('/api/auth/login', {
+        method: 'POST',
+        body: credentials
+    })
 }
 
 export function getProfile() {
-    return request('/api/profiles/me')
+    return request(`/api/profiles/${getStoredProfileId()}`)
 }
 
 export function saveProfile(profile) {
-    return request('/api/profiles/me', { method: 'PUT', body: profile })
+    return request(`/api/profiles/${getStoredProfileId()}`, {
+        method: 'PUT',
+        body: profile
+    })
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { login } from '../services/authApi.js'
+import {PASSWORD_REQUIREMENTS, validatePassword} from '../utils/passwordValidation.js'
 import './LoginForm.css'
 
 function LoginForm() {
@@ -12,9 +13,16 @@ function LoginForm() {
     async function handleSubmit(event) {
         event.preventDefault()
         setError('')
+
+        const passwordError = validatePassword(password)
+
+        if(passwordError) {
+            setError(passwordError)
+            return
+        }
+
         setIsSubmitting(true)
 
-        const formData = new FormData(event.currentTarget)
         try {
             const response = await login({
                 email: formData.get('email').trim(),
@@ -31,8 +39,13 @@ function LoginForm() {
             }
 
             window.localStorage.setItem('token', token)
-            if (typeof response.user?.id === 'string') {
-                window.localStorage.setItem('userId', response.user.id)
+            const userId = response.user?.id
+
+            if ((typeof userId === 'string' && userId.trim() !== '') || typeof userId === 'number') {
+                window.localStorage.setItem('userId', String(userId))
+            } else {
+                // Avoid accidentally retaining a previous user's ID.
+                window.localStorage.removeItem('userId')
             }
             navigate('/', { replace: true })
         } catch (requestError) {
@@ -67,9 +80,13 @@ function LoginForm() {
                             type="password"
                             name="password"
                             autoComplete="current-password"
+                            aria-describedby="login-password-help"
                             required
                         />
                     </label>
+                    <p id={"login-password-help"}>
+                        {PASSWORD_REQUIREMENTS}
+                    </p>
                     {error && (
                         <p className="auth-error" role="alert">
                             {error}

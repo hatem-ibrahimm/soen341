@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { register } from '../services/authApi.js'
+import { PASSWORD_REQUIREMENTS, validatePassword } from '../utils/passwordValidation.js'
 import './RegistrationForm.css'
 
 function RegistrationForm() {
@@ -16,6 +17,12 @@ function RegistrationForm() {
         const password = formData.get('password')
         const confirmPassword = formData.get('confirmPassword')
 
+        const passwordError = validatePassword(password)
+
+        if (passwordError) {
+            setError(error)
+            return
+        }
         if (password !== confirmPassword) {
             setError('Passwords do not match.')
             return
@@ -78,9 +85,13 @@ function RegistrationForm() {
                             type="password"
                             name="password"
                             autoComplete="new-password"
+                            aria-describedby="registration-password-help"
                             required
                         />
                     </label>
+                    <p id="registration-password-help">
+                        {PASSWORD_REQUIREMENTS}
+                    </p>
                     <label>
                         Confirm password
                         <input

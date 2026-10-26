@@ -1320,7 +1320,7 @@ def create_app(test_config=None):
             if connection is not None:
                 connection.close()
 
-    # Sprint 2, Issue #41: job application submission
+  
     if __package__:
         from .application_submission import register_application_submission_routes
     else:
@@ -1330,13 +1330,23 @@ def create_app(test_config=None):
         app, get_connection, get_current_user
     )
 
-    # Sprint 2, Issue #42: application tracking and recruiter status updates
+
     if __package__:
         from .application_tracking import register_application_tracking_routes
     else:
         from application_tracking import register_application_tracking_routes
 
     register_application_tracking_routes(
+        app, get_connection, get_current_user
+    )
+
+
+    if __package__:
+        from .recruiter_postings import register_recruiter_posting_routes
+    else:
+        from recruiter_postings import register_recruiter_posting_routes
+
+    register_recruiter_posting_routes(
         app, get_connection, get_current_user
     )
 

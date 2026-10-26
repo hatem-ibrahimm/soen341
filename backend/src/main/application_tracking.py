@@ -28,7 +28,7 @@ def _application_dict(row):
     return {
         "id": str(row[0]),
         "applicant_id": str(row[1]),
-        "job_id": str(row[2]),
+        "job_id": row[2],
         "resume_id": str(row[3]) if row[3] is not None else None,
         "status": str(row[4]),
         "submitted_at": (

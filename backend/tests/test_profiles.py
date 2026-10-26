@@ -1,3 +1,4 @@
+
 import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -5,83 +6,165 @@ from unittest.mock import MagicMock
 from src.main.app import create_app
 
 
-PROFILE_ID = "11111111-1111-1111-1111-111111111111"
-PROFILE_ROW = (
-	PROFILE_ID,
-	"Parsa",
-	"Dalirirad",
-	"Software Engineer",
-	"parsa@example.com",
-	"555-0100",
-	"Montreal",
-	"A profile bio",
-	"2026-01-01T00:00:00+00:00",
-	"2026-01-02T00:00:00+00:00",
-)
-
-
 class ProfileApiTests(unittest.TestCase):
-	def setUp(self):
-		self.supabase = MagicMock()
-		self.supabase.auth.get_user.return_value = SimpleNamespace(
-			user=SimpleNamespace(id=PROFILE_ID, email="parsa@example.com")
-		)
-		self.cursor = MagicMock()
-		self.connection = MagicMock()
-		self.connection.cursor.return_value = self.cursor
-		self.app = create_app(
-			{
-				"TESTING": True,
-				"SUPABASE_CLIENT_FACTORY": lambda: self.supabase,
-				"DB_CONNECTION_FACTORY": lambda: self.connection,
-			}
-		)
-		self.client = self.app.test_client()
-		self.headers = {"Authorization": "Bearer access-token"}
 
-	def test_get_profile_returns_database_row(self):
-		self.cursor.fetchone.return_value = PROFILE_ROW
+    def setUp(self):
+        # Use a valid UUID because profile IDs match Supabase user IDs.
+        self.profile_id = "550e8400-e29b-41d4-a716-446655440000"
 
-		response = self.client.get(
-			f"/api/profiles/{PROFILE_ID}", headers=self.headers
-		)
+        # Mock the database connection and cursor.
+        self.connection = MagicMock()
+        self.cursor = MagicMock()
+        self.connection.cursor.return_value = self.cursor
 
-		self.assertEqual(response.status_code, 200)
-		self.assertEqual(response.get_json()["profile"]["title"], "Software Engineer")
-		self.cursor.execute.assert_called_once()
-		self.assertIn("updated_at", self.cursor.execute.call_args.args[0])
-		self.assertEqual(self.cursor.execute.call_args.args[1], (PROFILE_ID,))
-		self.connection.close.assert_called_once()
+        # A profile row must match the order in PROFILE_COLUMNS.
+        self.profile_row = (
+            self.profile_id,
+            "Jane",
+            "Doe",
+            "Computer Engineering Student",
+            "jane.doe@example.com",
+            "514-555-1234",
+            "Montreal, QC",
+            "Computer Engineering student",
+            "2026-10-23T10:00:00+00:00",
+            "2026-10-23T10:00:00+00:00",
+        )
+        self.cursor.fetchone.return_value = self.profile_row
 
-	def test_update_profile_writes_profile_fields(self):
-		self.cursor.fetchone.return_value = PROFILE_ROW
+        # Mock Supabase authentication.
+        self.supabase = MagicMock()
+        self.supabase.auth.get_user.return_value = SimpleNamespace(
+            user=SimpleNamespace(
+                id=self.profile_id,
+                email="jane.doe@example.com",
+            )
+        )
 
-		response = self.client.put(
-			f"/api/profiles/{PROFILE_ID}",
-			headers=self.headers,
-			json={
-				"first_name": "Parsa",
-				"last_name": "Dalirirad",
-				"title": "Software Engineer",
-				"email": "parsa@example.com",
-				"phone_number": "555-0100",
-				"location": "Montreal",
-				"bio": "A profile bio",
-			},
-		)
+        self.app = create_app({
+            "TESTING": True,
+            "DB_CONNECTION_FACTORY": lambda: self.connection,
+            "SUPABASE_CLIENT_FACTORY": lambda: self.supabase,
+        })
 
-		self.assertEqual(response.status_code, 200)
-		self.assertEqual(response.get_json()["profile"]["id"], PROFILE_ID)
-		self.assertIn("updated_at", self.cursor.execute.call_args.args[0])
-		self.assertEqual(self.cursor.execute.call_args.args[1][-1], PROFILE_ID)
-		self.connection.commit.assert_called_once()
+        self.client = self.app.test_client()
 
-	def test_profile_request_requires_authentication(self):
-		response = self.client.get(f"/api/profiles/{PROFILE_ID}")
+        self.headers = {
+            "Authorization": "Bearer test-token"
+        }
 
-		self.assertEqual(response.status_code, 401)
-		self.connection.cursor.assert_not_called()
+        self.profile_data = {
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "title": "Computer Engineering Student",
+            "email": "jane.doe@example.com",
+            "phone_number": "514-555-1234",
+            "location": "Montreal, QC",
+            "bio": "Computer Engineering student",
+        }
+
+    def test_get_profile_succeeds(self):
+        response = self.client.get(
+            f"/api/profiles/{self.profile_id}",
+            headers=self.headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+
+        self.assertIn("profile", data)
+        self.assertEqual(data["profile"]["id"], self.profile_id)
+        self.assertEqual(data["profile"]["first_name"], "Jane")
+        self.cursor.execute.assert_called_once()
+
+    def test_get_profile_not_found(self):
+        self.cursor.fetchone.return_value = None
+
+        response = self.client.get(
+            f"/api/profiles/{self.profile_id}",
+            headers=self.headers,
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(
+            response.get_json()["error"],
+            "Profile not found.",
+        )
+
+    def test_update_profile_succeeds(self):
+        response = self.client.put(
+            f"/api/profiles/{self.profile_id}",
+            headers=self.headers,
+            json=self.profile_data,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+
+        self.assertEqual(
+            data["message"],
+            "Profile updated successfully.",
+        )
+        self.assertEqual(data["profile"]["first_name"], "Jane")
+        self.connection.commit.assert_called_once()
+
+    def test_update_profile_not_found(self):
+        self.cursor.fetchone.return_value = None
+
+        response = self.client.put(
+            f"/api/profiles/{self.profile_id}",
+            headers=self.headers,
+            json=self.profile_data,
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(
+            response.get_json()["error"],
+            "Profile not found.",
+        )
+        self.connection.rollback.assert_called_once()
+
+    def test_missing_fields_are_rejected(self):
+        response = self.client.put(
+            f"/api/profiles/{self.profile_id}",
+            headers=self.headers,
+            json={
+                "first_name": "Jane",
+                "last_name": "Doe",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("error", response.get_json())
+        self.cursor.execute.assert_not_called()
+
+    def test_invalid_json_is_rejected(self):
+        response = self.client.put(
+            f"/api/profiles/{self.profile_id}",
+            headers=self.headers,
+            data="not valid json",
+            content_type="application/json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.get_json()["error"],
+            "Request body must be valid JSON.",
+        )
+        self.cursor.execute.assert_not_called()
+
+    def test_authentication_is_required(self):
+        response = self.client.get(
+            f"/api/profiles/{self.profile_id}"
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(
+            response.get_json()["error"],
+            "Authentication required.",
+        )
+        self.connection.cursor.assert_not_called()
 
 
 if __name__ == "__main__":
-	unittest.main()
+    unittest.main()

@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from supabase import create_client
+from werkzeug.utils import secure_filename
+from werkzeug.utils import secure_filename
 
 try:
     import psycopg2
@@ -57,6 +59,9 @@ def create_app(test_config=None):
         SUPABASE_KEY=os.getenv("SUPABASE_KEY", ""),
         DATABASE_URL=os.getenv("DATABASE_URL", ""),
         MIN_PASSWORD_LENGTH=int(os.getenv("MIN_PASSWORD_LENGTH", "8")),
+        RESUME_BUCKET=os.getenv("SUPABASE_RESUME_BUCKET", "resumes"),
+        RESUME_MAX_SIZE=10 * 1024 * 1024,  # 10 MB
+        RESUME_SIGNED_URL_SECONDS=3600,    # 1 hour
     )
 
     if test_config:
@@ -333,12 +338,9 @@ def create_app(test_config=None):
         ), 200
 
     # -------------------------
-    # Profile Management - US-02
-    # -------------------------
-    # A profile row is created automatically by the database trigger
-    # (handle_new_user) when someone registers, and its id is the same
-    # as the user's Supabase id. So there is no "create profile" route:
-    # the frontend only reads (GET) and updates (PUT) it.
+    # Profile Management
+    # A profile row is created automatically by the database trigger (handle_new_user) when someone registers, and its id is the same
+    # as the user's Supabase id. So there is no "create profile" route: the frontend only reads (GET) and updates (PUT) it.
 
     @app.get("/api/profiles/<profile_id>")
     def get_profile(profile_id):
@@ -483,6 +485,652 @@ def create_app(test_config=None):
             if cursor is not None:
                 cursor.close()
 
+            if connection is not None:
+                connection.close()
+
+
+    # -------------------------
+    # Profile Picture Management
+    # -------------------------
+
+    MAX_PICTURE_SIZE = 2 * 1024 * 1024  # 2 MB
+    PICTURE_BUCKET = "profile-pictures"
+
+    def validate_picture(file):
+        """Validate the uploaded profile picture."""
+        if not file or not file.filename:
+            return None, None, "A profile picture is required."
+
+        filename = secure_filename(file.filename)
+        extension = os.path.splitext(filename)[1].lower()
+
+        if extension not in {".jpg", ".jpeg", ".png"}:
+            return None, None, "Only JPG, JPEG, and PNG images are allowed."
+
+        image_bytes = file.stream.read(MAX_PICTURE_SIZE + 1)
+
+        if not image_bytes:
+            return None, None, "The uploaded image is empty."
+
+        if len(image_bytes) > MAX_PICTURE_SIZE:
+            return None, None, "The image must be 2 MB or smaller."
+
+        if image_bytes.startswith(b"\xff\xd8\xff"):
+            content_type = "image/jpeg"
+        elif image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+            content_type = "image/png"
+        else:
+            return None, None, "The uploaded file is not a valid JPG or PNG image."
+
+        if extension == ".png" and content_type != "image/png":
+            return None, None, "The file extension does not match the image."
+
+        if extension in {".jpg", ".jpeg"} and content_type != "image/jpeg":
+            return None, None, "The file extension does not match the image."
+
+        return image_bytes, content_type, None
+
+    @app.post("/api/profiles/<profile_id>/picture")
+    @app.put("/api/profiles/<profile_id>/picture")
+    def upload_profile_picture(profile_id):
+        access_error = check_profile_access(profile_id)
+        if access_error:
+            return access_error
+
+        image_bytes, content_type, error = validate_picture(
+            request.files.get("picture")
+        )
+
+        if error:
+            return jsonify({"error": error}), 400
+
+        connection = None
+        cursor = None
+        new_path = f"{profile_id}/{uuid.uuid4().hex}"
+        uploaded = False
+
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                SELECT profile_picture_path
+                FROM profiles
+                WHERE id = %s
+                """,
+                (profile_id,),
+            )
+            row = cursor.fetchone()
+
+            if row is None:
+                return jsonify({"error": "Profile not found."}), 404
+
+            old_path = row[0]
+            supabase = get_supabase()
+
+            supabase.storage.from_(PICTURE_BUCKET).upload(
+                new_path,
+                image_bytes,
+                file_options={
+                    "content-type": content_type,
+                    "upsert": "false",
+                },
+            )
+            uploaded = True
+
+            cursor.execute(
+                """
+                UPDATE profiles
+                SET profile_picture_path = %s
+                WHERE id = %s
+                """,
+                (new_path, profile_id),
+            )
+            connection.commit()
+
+            if old_path:
+                try:
+                    supabase.storage.from_(PICTURE_BUCKET).remove([old_path])
+                except Exception:
+                    app.logger.warning(
+                        "Could not remove the previous profile picture."
+                    )
+
+            return jsonify(
+                {
+                    "message": "Profile picture uploaded successfully.",
+                    "profile_picture_path": new_path,
+                }
+            ), 200
+
+        except Exception:
+            if connection is not None:
+                connection.rollback()
+
+            if uploaded:
+                try:
+                    get_supabase().storage.from_(PICTURE_BUCKET).remove(
+                        [new_path]
+                    )
+                except Exception:
+                    app.logger.warning(
+                        "Could not clean up the uploaded profile picture."
+                    )
+
+            app.logger.exception("Profile picture upload failed")
+            return jsonify(
+                {"error": "Unable to upload the profile picture."}
+            ), 500
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if connection is not None:
+                connection.close()
+
+    @app.get("/api/profiles/<profile_id>/picture")
+    def get_profile_picture(profile_id):
+        access_error = check_profile_access(profile_id)
+        if access_error:
+            return access_error
+
+        connection = None
+        cursor = None
+
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                SELECT profile_picture_path
+                FROM profiles
+                WHERE id = %s
+                """,
+                (profile_id,),
+            )
+            row = cursor.fetchone()
+
+            if row is None:
+                return jsonify({"error": "Profile not found."}), 404
+
+            picture_path = row[0]
+
+            if not picture_path:
+                return jsonify(
+                    {"error": "No profile picture has been uploaded."}
+                ), 404
+
+            response = get_supabase().storage.from_(
+                PICTURE_BUCKET
+            ).create_signed_url(picture_path, 300)
+
+            if isinstance(response, dict):
+                signed_url = (
+                    response.get("signedURL")
+                    or response.get("signedUrl")
+                )
+            else:
+                signed_url = (
+                    getattr(response, "signed_url", None)
+                    or getattr(response, "signedURL", None)
+                )
+
+            if not signed_url:
+                return jsonify(
+                    {"error": "Unable to retrieve the profile picture."}
+                ), 500
+
+            return jsonify({"url": signed_url}), 200
+
+        except Exception:
+            app.logger.exception("Profile picture retrieval failed")
+            return jsonify(
+                {"error": "Unable to retrieve the profile picture."}
+            ), 500
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if connection is not None:
+                connection.close()
+
+    @app.delete("/api/profiles/<profile_id>/picture")
+    def delete_profile_picture(profile_id):
+        access_error = check_profile_access(profile_id)
+        if access_error:
+            return access_error
+
+        connection = None
+        cursor = None
+
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                SELECT profile_picture_path
+                FROM profiles
+                WHERE id = %s
+                """,
+                (profile_id,),
+            )
+            row = cursor.fetchone()
+
+            if row is None:
+                return jsonify({"error": "Profile not found."}), 404
+
+            picture_path = row[0]
+
+            if not picture_path:
+                return jsonify(
+                    {"error": "No profile picture to delete."}
+                ), 404
+
+            cursor.execute(
+                """
+                UPDATE profiles
+                SET profile_picture_path = NULL
+                WHERE id = %s
+                """,
+                (profile_id,),
+            )
+            connection.commit()
+
+            try:
+                get_supabase().storage.from_(PICTURE_BUCKET).remove(
+                    [picture_path]
+                )
+            except Exception:
+                app.logger.warning(
+                    "Could not remove the deleted picture from storage."
+                )
+
+            return jsonify(
+                {"message": "Profile picture deleted successfully."}
+            ), 200
+
+        except Exception:
+            if connection is not None:
+                connection.rollback()
+
+            app.logger.exception("Profile picture deletion failed")
+            return jsonify(
+                {"error": "Unable to delete the profile picture."}
+            ), 500
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if connection is not None:
+                connection.close()
+
+
+    # Resume management
+
+    RESUME_COLUMNS = [
+        "id",
+        "profile_id",
+        "file_name",
+        "storage_path",
+        "content_type",
+        "file_size",
+        "uploaded_at",
+    ]
+
+    ALLOWED_RESUME_TYPES = {
+        ".pdf": "application/pdf",
+        ".doc": "application/msword",
+    }
+
+    def resume_to_dict(row):
+        """Convert a database resume row into a JSON-friendly dictionary."""
+        return dict(zip(RESUME_COLUMNS, row))
+
+    def get_resume_storage():
+        """Return the configured Supabase Storage bucket."""
+        return get_supabase().storage.from_(app.config["RESUME_BUCKET"])
+
+    def check_resume_access(profile_id):
+        """Allow only the authenticated owner to manage a resume."""
+        if not is_valid_uuid(profile_id):
+            return None, (jsonify({"error": "Invalid profile ID."}), 400)
+
+        user = get_current_user()
+
+        if user is None:
+            return None, (
+                jsonify({"error": "Authentication required."}),
+                401,
+            )
+
+        if str(user.id) != profile_id:
+            return None, (
+                jsonify({"error": "Access denied."}),
+                403,
+            )
+
+        return user, None
+
+    def read_resume_upload():
+        """Validate and read the uploaded resume file."""
+        file = request.files.get("resume")
+
+        if file is None or not file.filename:
+            return None, (
+                jsonify({"error": "A resume file is required."}),
+                400,
+            )
+
+        file_name = secure_filename(file.filename)
+
+        if not file_name:
+            return None, (
+                jsonify({"error": "Invalid filename."}),
+                400,
+            )
+
+        extension = os.path.splitext(file_name)[1].lower()
+
+        if extension not in ALLOWED_RESUME_TYPES:
+            return None, (
+                jsonify({"error": "Only PDF and DOC files are allowed."}),
+                400,
+            )
+
+        # Read at most 10 MB plus one byte to detect oversized uploads.
+        file_bytes = file.stream.read(
+            app.config["RESUME_MAX_SIZE"] + 1
+        )
+
+        if not file_bytes:
+            return None, (
+                jsonify({"error": "The uploaded file is empty."}),
+                400,
+            )
+
+        if len(file_bytes) > app.config["RESUME_MAX_SIZE"]:
+            return None, (
+                jsonify({"error": "Resume must be 10 MB or smaller."}),
+                413,
+            )
+
+        content_type = ALLOWED_RESUME_TYPES[extension]
+
+        return {
+            "file_name": file_name,
+            "file_bytes": file_bytes,
+            "content_type": content_type,
+            "file_size": len(file_bytes),
+            "extension": extension,
+        }, None
+
+    def upload_resume(profile_id, replace_existing=False):
+        """Upload a new resume or replace the user's existing resume."""
+        _, access_error = check_resume_access(profile_id)
+
+        if access_error:
+            return access_error
+
+        upload, upload_error = read_resume_upload()
+
+        if upload_error:
+            return upload_error
+
+        connection = None
+        new_storage_path = None
+
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                SELECT id, profile_id, file_name, storage_path,
+                       content_type, file_size, uploaded_at
+                FROM resumes
+                WHERE profile_id = %s
+                """,
+                (profile_id,),
+            )
+            existing_row = cursor.fetchone()
+
+            if existing_row and not replace_existing:
+                connection.rollback()
+                return jsonify({
+                    "error": "A resume already exists. Use PUT to replace it."
+                }), 409
+
+            if not existing_row and replace_existing:
+                connection.rollback()
+                return jsonify({"error": "Resume not found."}), 404
+
+            # Give every uploaded file a unique storage path.
+            new_storage_path = (
+                f"{profile_id}/{uuid.uuid4().hex}"
+                f"{upload['extension']}"
+            )
+
+            storage = get_resume_storage()
+
+            storage.upload(
+                new_storage_path,
+                upload["file_bytes"],
+                file_options={
+                    "content-type": upload["content_type"],
+                    "upsert": "false",
+                },
+            )
+
+            if existing_row:
+                old_resume = resume_to_dict(existing_row)
+
+                cursor.execute(
+                    """
+                    UPDATE resumes
+                    SET file_name = %s,
+                        storage_path = %s,
+                        content_type = %s,
+                        file_size = %s,
+                        uploaded_at = CURRENT_TIMESTAMP
+                    WHERE profile_id = %s
+                    RETURNING id, profile_id, file_name, storage_path,
+                              content_type, file_size, uploaded_at
+                    """,
+                    (
+                        upload["file_name"],
+                        new_storage_path,
+                        upload["content_type"],
+                        upload["file_size"],
+                        profile_id,
+                    ),
+                )
+            else:
+                old_resume = None
+
+                cursor.execute(
+                    """
+                    INSERT INTO resumes (
+                        profile_id, file_name, storage_path,
+                        content_type, file_size, uploaded_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    RETURNING id, profile_id, file_name, storage_path,
+                              content_type, file_size, uploaded_at
+                    """,
+                    (
+                        profile_id,
+                        upload["file_name"],
+                        new_storage_path,
+                        upload["content_type"],
+                        upload["file_size"],
+                    ),
+                )
+
+            saved_row = cursor.fetchone()
+            connection.commit()
+
+            # Delete the old file only after the replacement is saved.
+            if old_resume:
+                try:
+                    storage.remove([old_resume["storage_path"]])
+                except Exception:
+                    # The database now points to the new resume.
+                    # A failed cleanup may leave an orphaned old file.
+                    pass
+
+            return jsonify({
+                "message": (
+                    "Resume replaced successfully."
+                    if old_resume
+                    else "Resume uploaded successfully."
+                ),
+                "resume": resume_to_dict(saved_row),
+            }), 200 if old_resume else 201
+
+        except Exception:
+            if connection is not None:
+                connection.rollback()
+
+            # Clean up the newly uploaded file if saving its metadata failed.
+            if new_storage_path:
+                try:
+                    get_resume_storage().remove([new_storage_path])
+                except Exception:
+                    pass
+
+            return jsonify({"error": "Unable to save resume."}), 500
+
+        finally:
+            if connection is not None:
+                connection.close()
+
+    @app.route(
+        "/api/profiles/<profile_id>/resume",
+        methods=["POST"],
+    )
+    def create_resume(profile_id):
+        return upload_resume(profile_id)
+
+    @app.route(
+        "/api/profiles/<profile_id>/resume",
+        methods=["PUT"],
+    )
+    def replace_resume(profile_id):
+        return upload_resume(profile_id, replace_existing=True)
+
+    @app.route(
+        "/api/profiles/<profile_id>/resume",
+        methods=["GET"],
+    )
+    def get_resume(profile_id):
+        _, access_error = check_resume_access(profile_id)
+
+        if access_error:
+            return access_error
+
+        connection = None
+
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                SELECT id, profile_id, file_name, storage_path,
+                       content_type, file_size, uploaded_at
+                FROM resumes
+                WHERE profile_id = %s
+                """,
+                (profile_id,),
+            )
+            row = cursor.fetchone()
+
+            if row is None:
+                return jsonify({"error": "Resume not found."}), 404
+
+            resume = resume_to_dict(row)
+
+            result = get_resume_storage().create_signed_url(
+                resume["storage_path"],
+                app.config["RESUME_SIGNED_URL_SECONDS"],
+            )
+
+            # Supabase SDK versions may use either key spelling.
+            signed_url = (
+                result.get("signedURL")
+                or result.get("signedUrl")
+            )
+
+            if not signed_url:
+                return jsonify({
+                    "error": "Unable to generate resume download link."
+                }), 500
+
+            resume["download_url"] = signed_url
+
+            return jsonify({"resume": resume}), 200
+
+        except Exception:
+            return jsonify({"error": "Unable to retrieve resume."}), 500
+
+        finally:
+            if connection is not None:
+                connection.close()
+
+    @app.route(
+        "/api/profiles/<profile_id>/resume",
+        methods=["DELETE"],
+    )
+    def delete_resume(profile_id):
+        _, access_error = check_resume_access(profile_id)
+
+        if access_error:
+            return access_error
+
+        connection = None
+
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                SELECT storage_path
+                FROM resumes
+                WHERE profile_id = %s
+                """,
+                (profile_id,),
+            )
+            row = cursor.fetchone()
+
+            if row is None:
+                return jsonify({"error": "Resume not found."}), 404
+
+            storage_path = row[0]
+
+            # Remove the file before deleting its database record.
+            get_resume_storage().remove([storage_path])
+
+            cursor.execute(
+                "DELETE FROM resumes WHERE profile_id = %s",
+                (profile_id,),
+            )
+            connection.commit()
+
+            return jsonify({
+                "message": "Resume deleted successfully."
+            }), 200
+
+        except Exception:
+            if connection is not None:
+                connection.rollback()
+
+            return jsonify({"error": "Unable to delete resume."}), 500
+
+        finally:
             if connection is not None:
                 connection.close()
 

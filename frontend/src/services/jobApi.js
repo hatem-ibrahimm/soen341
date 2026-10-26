@@ -213,7 +213,7 @@ export async function getJob(jobId) {
 export function formatJobSalary(job) {
     const formatter = new Intl.NumberFormat('en-CA', {
         style: 'currency',
-        currency: 'USD',
+        currency: 'CAD',
         maximumFractionDigits: 0,
     })
     const minimum = Number(job.salary_min)

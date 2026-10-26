@@ -111,9 +111,6 @@ export function login(credentials) {
     })
 }
 
-export function getProfile(profileId) {
-    return request(`/api/profiles/${encodeURIComponent(profileId)}`)
-}
 function getStoredProfileId() {
     const userId = window.localStorage.getItem('userId')
 
@@ -122,12 +119,6 @@ function getStoredProfileId() {
             'Please log in to access your profile.',
         )
     }
-
-export function saveProfile(profileId, profile) {
-    return request(`/api/profiles/${encodeURIComponent(profileId)}`, {
-        method: 'PUT',
-        body: profile,
-    })
     return encodeURIComponent(userId)
 }
 
@@ -150,5 +141,4 @@ export function saveProfile(
             signal,
         },
     )
-}
 }

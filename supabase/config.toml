@@ -116,12 +116,22 @@ enabled = true
 # The maximum file size allowed (e.g. "5MB", "500KB").
 file_size_limit = "50MiB"
 
-# Uncomment to configure local storage buckets
-# [storage.buckets.images]
-# public = false
-# file_size_limit = "50MiB"
-# allowed_mime_types = ["image/png", "image/jpeg"]
-# objects_path = "./images"
+# Local storage buckets used by the Flask backend (private files).
+# The sprint2 migration creates the same buckets; having them here as well
+# guarantees they exist after `supabase start` / `supabase db reset`.
+[storage.buckets.resumes]
+public = false
+file_size_limit = "10MiB"
+allowed_mime_types = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+]
+
+[storage.buckets.profile-pictures]
+public = false
+file_size_limit = "2MiB"
+allowed_mime_types = ["image/jpeg", "image/png"]
 
 # Allow connections via S3 compatible clients
 [storage.s3_protocol]

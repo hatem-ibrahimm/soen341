@@ -1,7 +1,26 @@
 import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import {
+    Link,
+    useLocation,
+    useNavigate,
+} from 'react-router-dom'
 import { login } from '../services/authApi.js'
+import {
+    PASSWORD_REQUIREMENTS,
+    validatePassword,
+} from '../utils/passwordValidation.js'
 import './LoginForm.css'
+
+function getReturnDestination(value) {
+    if (
+        typeof value === 'string' &&
+        /^\/jobs(?:\/[^?#\\]*)?(?:\?[^#\\]*)?$/.test(value)
+    ) {
+        return value
+    }
+
+    return '/'
+}
 
 function LoginForm() {
     const [error, setError] = useState('')
@@ -11,19 +30,34 @@ function LoginForm() {
 
     async function handleSubmit(event) {
         event.preventDefault()
+
+        if (isSubmitting) return
+
         setError('')
-        setIsSubmitting(true)
 
         const formData = new FormData(event.currentTarget)
+        const email = String(formData.get('email') ?? '').trim()
+        const password = String(formData.get('password') ?? '')
+
+        // Sprint 2: retain frontend password-policy validation.
+        // Do not trim or otherwise modify the password.
+        const passwordError = validatePassword(password)
+
+        if (passwordError) {
+            setError(passwordError)
+            return
+        }
+
+        setIsSubmitting(true)
+
         try {
-            const response = await login({
-                email: formData.get('email').trim(),
-                password: formData.get('password'),
-            })
+            const response = await login({ email, password })
+
             const token =
                 response.token ??
                 response.access_token ??
                 response.session?.access_token
+
             if (typeof token !== 'string' || !token) {
                 throw new Error(
                     'Login succeeded, but the server did not return an authentication token.',
@@ -31,12 +65,27 @@ function LoginForm() {
             }
 
             window.localStorage.setItem('token', token)
-            if (typeof response.user?.id === 'string') {
-                window.localStorage.setItem('userId', response.user.id)
+
+            const userId = response.user?.id
+
+            if (
+                (typeof userId === 'string' && userId.trim() !== '') ||
+                (typeof userId === 'number' && Number.isFinite(userId))
+            ) {
+                window.localStorage.setItem('userId', String(userId))
+            } else {
+                window.localStorage.removeItem('userId')
             }
-            navigate('/', { replace: true })
+
+            navigate(
+                getReturnDestination(location.state?.returnTo),
+                { replace: true },
+            )
         } catch (requestError) {
-            setError(requestError.message)
+            setError(
+                requestError.message ||
+                'Unable to log in. Please try again.',
+            )
         } finally {
             setIsSubmitting(false)
         }
@@ -44,13 +93,18 @@ function LoginForm() {
 
     return (
         <main className="auth-page">
-            <section className="auth-card" aria-labelledby="login-heading">
+            <section
+                className="auth-card"
+                aria-labelledby="login-heading"
+            >
                 <h1 id="login-heading">Log in</h1>
+
                 {location.state?.message && (
                     <p className="auth-success" role="status">
                         {location.state.message}
                     </p>
                 )}
+
                 <form onSubmit={handleSubmit}>
                     <label>
                         Email
@@ -61,26 +115,36 @@ function LoginForm() {
                             required
                         />
                     </label>
+
                     <label>
                         Password
                         <input
                             type="password"
                             name="password"
                             autoComplete="current-password"
+                            aria-describedby="login-password-help"
                             required
                         />
                     </label>
+
+                    <p id="login-password-help">
+                        {PASSWORD_REQUIREMENTS}
+                    </p>
+
                     {error && (
                         <p className="auth-error" role="alert">
                             {error}
                         </p>
                     )}
+
                     <button type="submit" disabled={isSubmitting}>
                         {isSubmitting ? 'Logging in…' : 'Log in'}
                     </button>
                 </form>
+
                 <p>
-                    New to CareerConnect? <Link to="/register">Create an account</Link>
+                    New to CareerConnect?{' '}
+                    <Link to="/register">Create an account</Link>
                 </p>
             </section>
         </main>

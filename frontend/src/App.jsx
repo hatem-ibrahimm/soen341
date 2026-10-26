@@ -9,9 +9,9 @@ import ApplicationSubmittedPage from './features/applications/ApplicationSubmitt
 import ApplyPage from './features/applications/ApplyPage.jsx'
 import MyApplicationsPage from './features/applications/MyApplicationsPage.jsx'
 import JobDetailsPlaceholderPage from './features/jobs/JobDetailsPlaceholderPage.jsx'
+import JobsPlaceholderPage from './features/jobs/JobsPlaceholderPage.jsx'
 import ProfilePage from './features/profile/ProfilePage.jsx'
 import { isLoggedIn } from './services/session.js'
-import JobListings from './components/JobListings.jsx'
 
 function App() {
     return (
@@ -24,7 +24,7 @@ function App() {
             {/* Logged-in pages share the top bar with the profile circle */}
             <Route element={<RequireAuth />}>
                 <Route element={<AppLayout />}>
-                    <Route path="/jobs" element={<JobListings />} />
+                    <Route path="/jobs" element={<JobsPlaceholderPage />} />
                     <Route path="/jobs/:jobId" element={<JobDetailsPlaceholderPage />} />
                     <Route path="/jobs/:jobId/apply" element={<ApplyPage />} />
                     <Route path="/profile" element={<ProfilePage />} />

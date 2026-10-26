@@ -840,7 +840,7 @@ def create_app(test_config=None):
                 400,
             )
 
-        # Read at most 10 MB plus one byte to detect oversized uploads.
+        
         file_bytes = file.stream.read(
             app.config["RESUME_MAX_SIZE"] + 1
         )
@@ -907,7 +907,7 @@ def create_app(test_config=None):
                 connection.rollback()
                 return jsonify({"error": "Resume not found."}), 404
 
-            # Give every uploaded file a unique storage path.
+            
             new_storage_path = (
                 f"{profile_id}/{uuid.uuid4().hex}"
                 f"{upload['extension']}"
@@ -972,13 +972,12 @@ def create_app(test_config=None):
             saved_row = cursor.fetchone()
             connection.commit()
 
-            # Delete the old file only after the replacement is saved.
+           
             if old_resume:
                 try:
                     storage.remove([old_resume["storage_path"]])
                 except Exception:
-                    # The database now points to the new resume.
-                    # A failed cleanup may leave an orphaned old file.
+                    
                     pass
 
             return jsonify({
@@ -994,7 +993,7 @@ def create_app(test_config=None):
             if connection is not None:
                 connection.rollback()
 
-            # Clean up the newly uploaded file if saving its metadata failed.
+            
             if new_storage_path:
                 try:
                     get_resume_storage().remove([new_storage_path])

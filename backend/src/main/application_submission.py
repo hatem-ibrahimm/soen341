@@ -1,9 +1,3 @@
-"""Sprint 2 job-application submission.
-
-Keep the application endpoint separate from teammates' existing authentication,
-profile and resume handlers. Database table contracts are documented in the
-Sprint 2 implementation notes and must be confirmed with the database owner.
-"""
 
 import uuid
 
@@ -41,8 +35,7 @@ def register_application_submission_routes(app, get_connection, get_current_user
 
     @app.post("/api/applications")
     def submit_job_application():
-        # Don't trust an applicant/user identifier from the request body.
-        # Reuse Supabase Auth token validation already in this repository.
+
         user = get_current_user()
         if user is None:
             return jsonify({"error": "Authentication required."}), 401
@@ -76,8 +69,7 @@ def register_application_submission_routes(app, get_connection, get_current_user
             conn = get_connection()
             cursor = conn.cursor()
 
-            # Hatem's job schema must provide jobs(id, status); only open jobs
-            # are eligible. Database schema is NOT created by this PR.
+
             cursor.execute(
                 "SELECT id FROM jobs WHERE id = %s AND status = %s",
                 (job_id, "open"),

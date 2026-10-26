@@ -1,7 +1,3 @@
-"""Issue #42 tests using mocked Supabase Auth and PostgreSQL.
-
-Mocked unit tests cannot demonstrate actual DB table/column compatibility.
-"""
 
 import unittest
 from datetime import datetime, timezone

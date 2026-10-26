@@ -1,10 +1,3 @@
-"""Sprint 2 Issue #42: list, view and update job-application statuses.
-
-This module deliberately does not modify Sprint 1 auth/profile/resume code or
-Issue #41's application-submission handler. It depends on the SQL contract in
-``backend/docs/job_application_tracking.md``; the database owner must confirm
-that contract before connecting it to the deployed Supabase PostgreSQL schema.
-"""
 
 import uuid
 

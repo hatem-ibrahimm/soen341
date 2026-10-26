@@ -1,0 +1,59 @@
+/* Shared design tokens for the whole app.
+   Import once in main.jsx; every *.module.css can use these variables. */
+:root {
+  /* Sprint 1 Profile Management palette */
+  --cc-primary: #2f3b5f;        /* blue-dark */
+  --cc-primary-hover: #252732;  /* text-color */
+  --cc-primary-soft: #dde3ef;   /* blue-light */
+  --cc-accent: #d14334;         /* orange */
+  --cc-text: #252732;
+  --cc-muted: #66707d;
+  --cc-bg: #f4f5f7;
+  --cc-surface: #ffffff;
+  --cc-border: #e2e5e9;
+  --cc-border-strong: #c9cfd8;
+  --cc-danger: #d14334;
+  --cc-danger-soft: #fbe9e7;
+  --cc-success: #2e7d5b;
+  --cc-success-soft: #e3f2ea;
+  --cc-warning: #9a5b00;
+  --cc-warning-soft: #fdf1dc;
+  --cc-purple: #5b4a9b;
+  --cc-purple-soft: #ece8f6;
+  --cc-radius: 10px;
+  --cc-radius-sm: 6px;
+  --cc-shadow: 0 1px 2px rgba(37, 39, 50, 0.06);
+  --cc-font: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+  /* The app has a light design only. This keeps the browser from switching
+     inputs and buttons to white text when the device is in dark mode. */
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--cc-font);
+  color: var(--cc-text);
+  background: var(--cc-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+input,
+textarea,
+select {
+  color: var(--cc-text);
+  background-color: var(--cc-surface);
+}

@@ -1,0 +1,8 @@
+.empty {
+  text-align: center; padding: 28px 16px;
+  border: 1px dashed var(--cc-border); border-radius: var(--cc-radius-sm);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+}
+.icon { font-size: 1.6rem; color: var(--cc-primary); }
+.title { margin: 0; font-weight: 650; }
+.text { margin: 0 0 8px; color: var(--cc-muted); font-size: 0.92rem; max-width: 40ch; }

@@ -1,4 +1,4 @@
-# Sprint 2 – Issue #42: Job Application Tracking API (Parsa)
+# Sprint 2 – Issue #42: Job Application Tracking API 
 
 **GitHub task:** #42 – Implement Job Application Tracking API.
 **Dependency:** #41 – Job Application Submission API (`POST /api/applications`).

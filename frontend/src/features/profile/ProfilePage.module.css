@@ -1,0 +1,138 @@
+.page { display: flex; flex-direction: column; gap: 20px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 20px; align-items: start; }
+.mainCol { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+/* sticky = the sidebar scrolls normally until it reaches 84px from the top of the
+   screen, then stays there while the left column keeps scrolling */
+.sidebar { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 84px; }
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { position: static; order: -1; flex-direction: row; flex-wrap: wrap; }
+  .sidebar > * { flex: 1 1 200px; }
+}
+
+.placeholder { color: var(--cc-muted); }
+.inlineError { color: var(--cc-danger); font-size: 0.85rem; margin: 6px 0 0; }
+
+/* Intro card: grey (or custom image) background on top, centered photo overlapping it */
+.headerCard {
+  background: var(--cc-surface); border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius); box-shadow: var(--cc-shadow); overflow: hidden;
+}
+.cover {
+  position: relative; height: 250px;
+  background-color: #d5d9e0;
+  background-size: cover; background-position: center;
+}
+.coverActions { position: absolute; right: 12px; top: 12px; display: flex; gap: 6px; }
+.coverBtn {
+  border: 0; border-radius: var(--cc-radius-sm); padding: 6px 12px; cursor: pointer;
+  background: rgba(255, 255, 255, 0.92); color: var(--cc-text); font-size: 0.82rem; font-weight: 600;
+  box-shadow: 0 1px 3px rgba(37, 39, 50, 0.18);
+}
+.coverBtn:hover { background: #fff; color: var(--cc-primary); }
+.coverBtn:disabled { opacity: 0.7; cursor: progress; }
+.headerBody {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 0 20px 24px;
+}
+.bigAvatar { position: relative; z-index: 1; margin-top: -64px; box-shadow: 0 0 0 5px var(--cc-surface); }
+.photoLink {
+  margin-top: 10px; border: 0; background: none; padding: 2px 4px; cursor: pointer;
+  color: var(--cc-muted); font-size: 0.82rem; text-decoration: underline;
+}
+.photoLink:hover { color: var(--cc-primary); }
+.name { margin: 10px 0 2px; font-size: 1.6rem; font-weight: 700; text-wrap: balance; }
+.headline { margin: 0; font-size: 1rem; color: var(--cc-text); }
+.contactRow {
+  list-style: none; margin: 14px 0 0; padding: 0;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+}
+.contactRow li {
+  padding: 4px 12px; border-radius: 4px; font-size: 0.85rem;
+  background: var(--cc-bg); color: var(--cc-muted); overflow-wrap: anywhere;
+}
+.headerEdit { margin-top: 18px; }
+
+.bio { margin: 0; white-space: pre-line; line-height: 1.6; }
+.sectionHint { margin: 0 0 14px; color: var(--cc-muted); font-size: 0.9rem; }
+
+/* Entry lists (experience, education) as a simple timeline */
+.entryList { list-style: none; margin: 0; padding: 0; }
+.entry {
+  position: relative; display: flex; gap: 12px; align-items: flex-start;
+  padding: 0 0 18px 22px;
+}
+.entry::before { /* dot */
+  content: ""; position: absolute; left: 0; top: 5px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--cc-surface); border: 2px solid var(--cc-primary);
+}
+.entry::after { /* line to the next entry */
+  content: ""; position: absolute; left: 6px; top: 19px; bottom: 2px;
+  width: 2px; background: var(--cc-border);
+}
+.entry:last-child { padding-bottom: 0; }
+.entry:last-child::after { display: none; }
+.entryBody { flex: 1; min-width: 0; }
+.entryTitle { margin: 0; font-size: 1rem; font-weight: 650; }
+.entrySub { margin: 2px 0 0; font-size: 0.93rem; }
+.entryMeta { margin: 2px 0 0; color: var(--cc-muted); font-size: 0.85rem; }
+.entryText { margin: 8px 0 0; font-size: 0.93rem; line-height: 1.5; white-space: pre-line; }
+
+/* Skills */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 4px;
+  background: var(--cc-primary-soft); color: var(--cc-primary); font-size: 0.88rem; font-weight: 600;
+}
+.chipEditable { padding-right: 4px; }
+.chipEditable button {
+  border: 0; background: none; cursor: pointer; color: var(--cc-primary);
+  width: 22px; height: 22px; border-radius: 4px; font-size: 1rem; line-height: 1;
+}
+.chipEditable button:hover { background: var(--cc-danger-soft); color: var(--cc-danger); }
+.skillForm { display: flex; gap: 8px; margin-bottom: 10px; }
+.skillForm input {
+  flex: 1; min-width: 0; border: 1px solid var(--cc-border); border-radius: var(--cc-radius-sm); padding: 9px 12px;
+}
+.skillForm input:focus { outline: none; border-color: var(--cc-primary); box-shadow: 0 0 0 3px var(--cc-primary-soft); }
+
+/* Resumes */
+.resumeList { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.resume {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 12px; border: 1px solid var(--cc-border); border-radius: var(--cc-radius-sm);
+}
+.fileIcon {
+  width: 40px; height: 48px; border-radius: 4px; flex-shrink: 0;
+  background: var(--cc-danger-soft); color: var(--cc-danger);
+  font-size: 0.7rem; font-weight: 800; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px;
+}
+.resumeInfo { flex: 1; min-width: 160px; display: flex; flex-direction: column; }
+.resumeName {
+  border: 0; background: none; padding: 0; text-align: left; cursor: pointer;
+  font-weight: 650; color: var(--cc-text); overflow-wrap: anywhere;
+}
+.resumeName:hover { color: var(--cc-primary); text-decoration: underline; }
+.resumeActions { display: flex; gap: 2px; }
+.defaultTag {
+  font-size: 0.75rem; font-weight: 700; color: var(--cc-success);
+  background: var(--cc-success-soft); padding: 3px 10px; border-radius: 4px;
+}
+
+/* Sidebar */
+.sideBox {
+  display: flex; flex-direction: column;
+  background: var(--cc-surface); border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius); padding: 14px 16px;
+}
+.sideTitle {
+  margin: 0 0 6px; font-size: 0.75rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--cc-muted);
+}
+.sideLink {
+  display: block; padding: 6px 8px; margin: 0 -8px; border-radius: 4px;
+  color: var(--cc-text); font-weight: 550; text-decoration: none; font-size: 0.92rem;
+}
+.sideLink:hover { background: var(--cc-primary-soft); color: var(--cc-primary); }

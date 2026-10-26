@@ -26,8 +26,8 @@ function RegistrationForm() {
             await register({
                 email: formData.get('email').trim(),
                 password,
-                firstName: formData.get('firstName').trim(),
-                lastName: formData.get('lastName').trim(),
+                first_name: formData.get('firstName').trim(),
+                last_name: formData.get('lastName').trim(),
             })
             navigate('/login', {
                 replace: true,

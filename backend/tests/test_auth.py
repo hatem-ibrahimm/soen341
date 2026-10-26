@@ -39,6 +39,8 @@ class AuthApiTests(unittest.TestCase):
             json={
                 "email": "Parsa@example.com",
                 "password": "StrongPass123",
+                "first_name": "Parsa",
+                "last_name": "Dalirirad",
             },
         )
 
@@ -49,8 +51,8 @@ class AuthApiTests(unittest.TestCase):
                 "password": "StrongPass123",
                 "options": {
                     "data": {
-                        "first_name": "",
-                        "last_name": "",
+                        "first_name": "Parsa",
+                        "last_name": "Dalirirad",
                     }
                 },
             }

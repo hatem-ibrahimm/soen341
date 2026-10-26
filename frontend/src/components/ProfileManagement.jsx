@@ -1,13 +1,10 @@
-import React, { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { getProfile, saveProfile } from "../services/authApi.js";
 import "./ProfileManagement.css";
-
-// address of the Flask backend (app.py runs on port 5000)
-const API_URL = "http://127.0.0.1:5000";
 
 function ProfileManagement() {
   // saved by the login page after a successful login
   const userId = localStorage.getItem("userId");
-  const token = localStorage.getItem("accessToken");
 
   // Keeps track of the selected tab, clicking a tab changes it and the right side updates
   const [activeTab, setActiveTab] = useState("personal");
@@ -45,15 +42,7 @@ function ProfileManagement() {
   useEffect(() => {
     async function loadProfile() {
       try {
-        const response = await fetch(`${API_URL}/api/profiles/${userId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await response.json();
-
-        if (!response.ok) {
-          setError(data.error || "Could not load your profile.");
-          return;
-        }
+        const data = await getProfile(userId);
 
         // the database can have empty (null) fields, so use "" instead
         const p = data.profile;
@@ -66,8 +55,8 @@ function ProfileManagement() {
           location: p.location || "",
           bio: p.bio || "",
         });
-      } catch {
-        setError("Could not reach the server. Is the backend running?");
+      } catch (requestError) {
+        setError(requestError.message || "Could not load your profile.");
       } finally {
         setLoading(false);
       }
@@ -76,7 +65,7 @@ function ProfileManagement() {
     if (userId) {
       loadProfile();
     }
-  }, []);
+  }, [userId]);
 
 
 
@@ -141,25 +130,12 @@ function ProfileManagement() {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/profiles/${userId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(profile),
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.error || "Could not save your profile.");
-        return;
-      }
+      await saveProfile(userId, profile);
 
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } catch {
-      setError("Could not reach the server. Is the backend running?");
+    } catch (requestError) {
+      setError(requestError.message || "Could not save your profile.");
     }
   }
 

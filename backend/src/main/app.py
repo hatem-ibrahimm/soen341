@@ -1,7 +1,9 @@
 import os
 import re
 import uuid
+from pathlib import Path
 
+from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from supabase import create_client
@@ -15,6 +17,8 @@ except ImportError:
 
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 # Columns returned for a profile, in this order
 PROFILE_COLUMNS = [

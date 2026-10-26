@@ -1,12 +1,3 @@
-"""Sprint 2 Issue #43: Recruiter-owned job posting creation and management.
-
-Only this module and its route registration are added to CareerConnect.
-Uses the existing Supabase Auth and PostgreSQL helpers; no migrations, profile,
-resume or existing application handlers are modified.
-
-Database contract in backend/docs/recruiter_job_postings.md must be confirmed
-with the database owner before a real integration test.
-"""
 
 import uuid
 from decimal import Decimal, InvalidOperation

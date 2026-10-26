@@ -1,0 +1,11 @@
+.badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px;
+  font-size: 0.8rem; font-weight: 650; white-space: nowrap;
+}
+.badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.blue { background: var(--cc-primary-soft); color: var(--cc-primary); }
+.amber { background: var(--cc-warning-soft); color: var(--cc-warning); }
+.purple { background: var(--cc-purple-soft); color: var(--cc-purple); }
+.green { background: var(--cc-success-soft); color: var(--cc-success); }
+.red { background: var(--cc-danger-soft); color: var(--cc-danger); }

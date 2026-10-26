@@ -1,0 +1,12 @@
+.drop {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 22px 16px; text-align: center; cursor: pointer;
+  border: 1.5px dashed var(--cc-border-strong); border-radius: var(--cc-radius-sm);
+  background: var(--cc-bg); transition: background 0.15s, border-color 0.15s;
+}
+.drop:hover, .dragging { border-color: var(--cc-primary); background: var(--cc-primary-soft); }
+.drop:focus-visible { outline: 2px solid var(--cc-primary); outline-offset: 2px; }
+.disabled { opacity: 0.6; cursor: progress; }
+.icon { font-size: 1.4rem; color: var(--cc-primary); }
+.label { font-weight: 600; color: var(--cc-primary); }
+.hint { font-size: 0.8rem; color: var(--cc-muted); }

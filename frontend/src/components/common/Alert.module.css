@@ -1,0 +1,4 @@
+.alert { padding: 10px 14px; border-radius: var(--cc-radius-sm); font-size: 0.92rem; }
+.error { background: var(--cc-danger-soft); color: var(--cc-danger); }
+.success { background: var(--cc-success-soft); color: var(--cc-success); }
+.info { background: var(--cc-primary-soft); color: var(--cc-primary); }

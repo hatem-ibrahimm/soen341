@@ -1,0 +1,27 @@
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+.full { grid-column: 1 / -1; }
+@media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field label { font-size: 0.85rem; font-weight: 600; color: var(--cc-text); }
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm);
+  padding: 9px 12px;
+  background: var(--cc-surface);
+  color: var(--cc-text);
+  resize: vertical;
+}
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  outline: none;
+  border-color: var(--cc-primary);
+  box-shadow: 0 0 0 3px var(--cc-primary-soft);
+}
+.invalid { border-color: var(--cc-danger) !important; }
+.hint { color: var(--cc-muted); font-size: 0.8rem; }
+.error { color: var(--cc-danger); font-size: 0.8rem; }

@@ -1,9 +1,3 @@
-"""Unit tests for the isolated Sprint 2 application-submission endpoint.
-
-These tests use mocks and do NOT demonstrate integration with Hatem's actual
-PostgreSQL schema; that integration must be verified separately.
-"""
-
 import unittest
 from datetime import datetime, timezone
 from types import SimpleNamespace

@@ -1133,6 +1133,213 @@ def create_app(test_config=None):
             if connection is not None:
                 connection.close()
 
+
+    # -------------------------
+    # Job Search and Listings
+    # -------------------------
+
+    @app.get("/api/jobs")
+    def get_jobs():
+        connection = None
+        cursor = None
+
+        try:
+            # Read optional search filters.
+            keyword = request.args.get("keyword", "").strip()
+            location = request.args.get("location", "").strip()
+            category = request.args.get("category", "").strip()
+
+            # Read optional salary filters.
+            min_salary = request.args.get("min_salary")
+            max_salary = request.args.get("max_salary")
+
+            try:
+                min_salary = (
+                    float(min_salary) if min_salary else None
+                )
+                max_salary = (
+                    float(max_salary) if max_salary else None
+                )
+
+                # Salary values must be finite and non-negative.
+                import math
+
+                if (
+                    (min_salary is not None and
+                     (not math.isfinite(min_salary) or min_salary < 0))
+                    or
+                    (max_salary is not None and
+                     (not math.isfinite(max_salary) or max_salary < 0))
+                ):
+                    raise ValueError
+
+            except ValueError:
+                return jsonify({
+                    "error": "Salary filters must be valid, non-negative numbers."
+                }), 400
+
+            if (
+                min_salary is not None
+                and max_salary is not None
+                and min_salary > max_salary
+            ):
+                return jsonify({
+                    "error": "Minimum salary cannot exceed maximum salary."
+                }), 400
+
+            # Retrieve published jobs.
+            query = """
+                SELECT id, title, company_name, location,
+                       category, description, min_salary,
+                       max_salary, created_at
+                FROM public.jobs
+                WHERE status = 'published'
+            """
+            params = []
+
+            # Search across the main job fields.
+            if keyword:
+                query += """
+                    AND (
+                        title ILIKE %s
+                        OR company_name ILIKE %s
+                        OR description ILIKE %s
+                        OR location ILIKE %s
+                        OR category ILIKE %s
+                    )
+                """
+                search_term = f"%{keyword}%"
+                params.extend([search_term] * 5)
+
+            # Optional location filter.
+            if location:
+                query += " AND location ILIKE %s"
+                params.append(f"%{location}%")
+
+            # Optional category filter.
+            if category:
+                query += " AND category ILIKE %s"
+                params.append(f"%{category}%")
+
+            # Include jobs whose salary ranges overlap the
+            # requested range. NULL means the bound is unspecified.
+            if min_salary is not None:
+                query += """
+                    AND (max_salary IS NULL OR max_salary >= %s)
+                """
+                params.append(min_salary)
+
+            if max_salary is not None:
+                query += """
+                    AND (min_salary IS NULL OR min_salary <= %s)
+                """
+                params.append(max_salary)
+
+            query += " ORDER BY created_at DESC"
+
+            connection = get_connection()
+            cursor = connection.cursor()
+            cursor.execute(query, tuple(params))
+
+            columns = [column[0] for column in cursor.description]
+            jobs = [
+                dict(zip(columns, row))
+                for row in cursor.fetchall()
+            ]
+
+            # Convert salary values to JSON-friendly numbers.
+            for job in jobs:
+                if job["min_salary"] is not None:
+                    job["min_salary"] = float(job["min_salary"])
+                if job["max_salary"] is not None:
+                    job["max_salary"] = float(job["max_salary"])
+
+            return jsonify({"jobs": jobs}), 200
+
+        except Exception:
+            app.logger.exception("Job listing retrieval failed")
+            return jsonify({
+                "error": "Unable to retrieve jobs at this time."
+            }), 500
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+
+            if connection is not None:
+                connection.close()
+
+    @app.get("/api/jobs/<int:job_id>")
+    def get_job_details(job_id):
+        connection = None
+        cursor = None
+
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                SELECT id, title, company_name, location,
+                       category, description, min_salary,
+                       max_salary, created_at
+                FROM public.jobs
+                WHERE id = %s AND status = 'published'
+                """,
+                (job_id,)
+            )
+
+            row = cursor.fetchone()
+
+            if row is None:
+                return jsonify({
+                    "error": "Job not found."
+                }), 404
+
+            columns = [column[0] for column in cursor.description]
+            job = dict(zip(columns, row))
+
+            # Convert salary values to JSON-friendly numbers.
+            if job["min_salary"] is not None:
+                job["min_salary"] = float(job["min_salary"])
+            if job["max_salary"] is not None:
+                job["max_salary"] = float(job["max_salary"])
+
+            return jsonify({"job": job}), 200
+
+        except Exception:
+            app.logger.exception("Job details retrieval failed")
+            return jsonify({
+                "error": "Unable to retrieve job details at this time."
+            }), 500
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+
+            if connection is not None:
+                connection.close()
+
+    # Sprint 2, Issue #41: job application submission
+    if __package__:
+        from .application_submission import register_application_submission_routes
+    else:
+        from application_submission import register_application_submission_routes
+
+    register_application_submission_routes(
+        app, get_connection, get_current_user
+    )
+
+    # Sprint 2, Issue #42: application tracking and recruiter status updates
+    if __package__:
+        from .application_tracking import register_application_tracking_routes
+    else:
+        from application_tracking import register_application_tracking_routes
+
+    register_application_tracking_routes(
+        app, get_connection, get_current_user
+    )
+
     return app
 
 

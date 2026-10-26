@@ -5,8 +5,16 @@
 }
 .banner code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; }
 .h1 { font-size: 1.35rem; margin: 0 0 12px; }
+.searchLabel { display: block; margin-bottom: 6px; font-weight: 600; }
+.searchInput {
+  box-sizing: border-box; width: 100%; margin-bottom: 16px; padding: 10px 12px;
+  border: 1px solid var(--cc-border); border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface); color: var(--cc-text); font: inherit;
+}
+.searchInput:focus-visible { outline: 2px solid var(--cc-primary); outline-offset: 2px; }
 .listCard { padding: 0 !important; }
 .list { list-style: none; margin: 0; padding: 0; }
+.emptyState { margin: 0; padding: 20px; color: var(--cc-muted); }
 .job { display: flex; gap: 14px; padding: 16px 20px; border-top: 1px solid var(--cc-border); align-items: flex-start; }
 .job:first-child { border-top: 0; }
 .info { flex: 1; min-width: 0; }

@@ -13,6 +13,7 @@ export default function JobsPlaceholderPage() {
     const [jobs, setJobs] = useState([])
     const [appliedIds, setAppliedIds] = useState(new Set())
     const [error, setError] = useState('')
+    const [search, setSearch] = useState('')
 
     useEffect(() => {
         Promise.all([listJobs(), listMyApplications()])
@@ -23,16 +24,33 @@ export default function JobsPlaceholderPage() {
             .catch((e) => setError(e.message))
     }, [])
 
+    const normalizedSearch = search.trim().toLocaleLowerCase()
+    const filteredJobs = jobs.filter((job) =>
+        [job.title, job.company, job.location, job.type, job.salary]
+            .some((value) => value?.toLocaleLowerCase().includes(normalizedSearch)),
+    )
+
     return (
         <div className={styles.wrap}>
             <div className={styles.banner}>
-                <strong>Placeholder job list.</strong> The real search &amp; filters come from the Job Listing feature. It only needs to link Apply to <code>/jobs/:jobId/apply</code>.
+                <strong>Placeholder job list.</strong> This page provides basic keyword search; full search and filters come from the Job Listing feature. Apply links to <code>/jobs/:jobId/apply</code>.
             </div>
             <h1 className={styles.h1}>Recommended jobs</h1>
             {error && <Alert tone="error">{error}</Alert>}
+            <label className={styles.searchLabel} htmlFor="job-search">
+                Search jobs
+            </label>
+            <input
+                className={styles.searchInput}
+                id="job-search"
+                type="search"
+                placeholder="Search by title, company, location, or type"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+            />
             <Card className={styles.listCard}>
                 <ul className={styles.list}>
-                    {jobs.map((job) => (
+                    {filteredJobs.map((job) => (
                         <li key={job.id} className={styles.job}>
                             <CompanyLogo name={job.company} />
                             <div className={styles.info}>
@@ -55,6 +73,13 @@ export default function JobsPlaceholderPage() {
                         </li>
                     ))}
                 </ul>
+                {!error && filteredJobs.length === 0 && (
+                    <p className={styles.emptyState} role="status">
+                        {jobs.length === 0
+                            ? 'No jobs are available.'
+                            : 'No jobs match your search.'}
+                    </p>
+                )}
             </Card>
         </div>
     )

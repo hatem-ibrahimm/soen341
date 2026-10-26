@@ -13,7 +13,7 @@ export function validatePassword(password) {
         return 'Your password must contain at least one number.'
     }
 
-    if (test(password).length < 10) {
+    if (password.length >= 10) {
         return 'Your password must be shorter than 10 characters.'
     }
     return ''

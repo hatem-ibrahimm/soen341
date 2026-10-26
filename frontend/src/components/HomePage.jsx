@@ -12,6 +12,7 @@ function HomePage() {
                     CareerConnect
                 </Link>
                 <nav className="home-nav" aria-label="Main navigation">
+                    <Link to="/jobs">Find jobs</Link>
                     {isLoggedIn ? (
                         <Link className="home-nav-primary" to="/profilemanagement">
                             My profile

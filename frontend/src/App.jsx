@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+
 import HomePage from './components/HomePage.jsx'
 import AppLayout from './components/layout/AppLayout.jsx'
 import RequireAuth from './components/layout/RequireAuth.jsx'
@@ -11,6 +12,9 @@ import JobDetailsPlaceholderPage from './features/jobs/JobDetailsPlaceholderPage
 import JobsPlaceholderPage from './features/jobs/JobsPlaceholderPage.jsx'
 import ProfilePage from './features/profile/ProfilePage.jsx'
 import { isLoggedIn } from './services/session.js'
+import ProfileManagement from './components/ProfileManagement.jsx'
+import JobListings from './components/JobListings.jsx'
+import JobDetails from './components/JobDetails.jsx'
 
 function App() {
     return (
@@ -34,6 +38,40 @@ function App() {
             </Route>
             <Route path="/profilemanagement" element={<Navigate to="/profile" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
+            <Route
+                path="/"
+                element={<HomePage />}
+            />
+
+            <Route
+                path="/login"
+                element={<LoginForm />}
+            />
+
+            <Route
+                path="/register"
+                element={<RegistrationForm />}
+            />
+
+            <Route
+                path="/profilemanagement"
+                element={<ProfileManagement />}
+            />
+
+            <Route
+                path="/jobs"
+                element={<JobListings />}
+            />
+
+            <Route
+                path="/jobs/:jobId"
+                element={<JobDetails />}
+            />
+
+            <Route
+                path="*"
+                element={<Navigate to="/" replace />}
+            />
         </Routes>
     )
 }

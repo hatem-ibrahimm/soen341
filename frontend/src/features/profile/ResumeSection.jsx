@@ -2,9 +2,10 @@ import { useRef, useState } from 'react'
 import { Alert, Button, Card, FilePicker, Modal } from '../../components/common'
 import useResumes from '../../hooks/useResumes.js'
 import { formatDate, formatFileSize } from '../../services/format.js'
+import { MULTIPLE_RESUMES, RESUME_ACCEPT } from '../../services/resumeApi.js'
 import styles from './ProfilePage.module.css'
 
-const ACCEPT = '.pdf,.doc,.docx'
+const ACCEPT = RESUME_ACCEPT
 
 // Upload, replace, delete, view, and choose a default resume.
 export default function ResumeSection() {
@@ -42,7 +43,9 @@ export default function ResumeSection() {
     return (
         <Card id="resumes" title="Resumes">
             <p className={styles.sectionHint}>
-                Your <strong>default</strong> resume is pre-selected when you apply to a job. PDF or Word, up to 5 MB.
+                 {MULTIPLE_RESUMES
+                    ? <>Your <strong>default</strong> resume is pre-selected when you apply to a job. PDF or DOC, up to 5 MB.</>
+                    : <>This resume is used when you apply to a job. PDF or DOC, up to 5 MB.</>}
             </p>
 
             {notice && <Alert tone="success">{notice}</Alert>}
@@ -65,7 +68,7 @@ export default function ResumeSection() {
                                     {formatFileSize(r.file_size)} · Uploaded {formatDate(r.uploaded_at)}
                                 </span>
                             </div>
-                            {r.is_default ? (
+                            {!MULTIPLE_RESUMES ? null : r.is_default ? (
                                 <span className={styles.defaultTag}>Default</span>
                             ) : (
                                 <Button size="sm" variant="ghost" onClick={() => makeDefault(r.id)} disabled={busyId === r.id}>
@@ -85,13 +88,13 @@ export default function ResumeSection() {
                 </ul>
             )}
 
-            <FilePicker
+            {(MULTIPLE_RESUMES || resumes.length === 0) && <FilePicker
                 accept={ACCEPT}
                 onSelect={handleUpload}
                 disabled={busyId === 'new'}
                 label={busyId === 'new' ? 'Uploading…' : resumes.length ? 'Upload another resume' : 'Upload your resume'}
-                hint="Drag & drop or click to browse · PDF, DOC, DOCX"
-            />
+                hint="Drag & drop or click to browse · PDF, DOC"
+            />}
             <input ref={replaceInput} type="file" accept={ACCEPT} hidden onChange={handleReplace} />
 
             {confirmDelete && (

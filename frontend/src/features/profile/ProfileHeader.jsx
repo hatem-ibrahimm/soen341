@@ -1,12 +1,13 @@
 import { useRef, useState } from 'react'
 import { Avatar, Button } from '../../components/common'
+import { COVER_SUPPORTED } from '../../services/profileApi.js'
 import styles from './ProfilePage.module.css'
 
 const MAX_PHOTO = 2 * 1024 * 1024 // 2 MB
 const MAX_COVER = 4 * 1024 * 1024 // 4 MB
 
 function checkImage(file, max) {
-    if (!file.type.startsWith('image/')) return 'Please choose an image file (JPG, PNG, ...).'
+    if (!['image/jpeg', 'image/png'].includes(file.type)) return 'Please choose a JPG or PNG image.'
     if (file.size > max) return `Images must be ${max / 1024 / 1024} MB or smaller.`
     return ''
 }
@@ -60,7 +61,7 @@ export default function ProfileHeader({ profile, onEdit, onAvatarChange, onCover
                 className={styles.cover}
                 style={profile.cover_url ? { backgroundImage: `url("${profile.cover_url}")` } : undefined}
             >
-                <div className={styles.coverActions}>
+                {COVER_SUPPORTED && <div className={styles.coverActions}>
                     <button className={styles.coverBtn} onClick={() => coverInput.current?.click()} disabled={busy === 'cover'}>
                         {busy === 'cover' ? 'Saving…' : profile.cover_url ? 'Change background' : 'Add background'}
                     </button>
@@ -69,8 +70,8 @@ export default function ProfileHeader({ profile, onEdit, onAvatarChange, onCover
                             Remove
                         </button>
                     )}
-                </div>
-                <input ref={coverInput} type="file" accept="image/*" hidden onChange={pick('cover')} />
+                </div>}
+                <input ref={coverInput} type="file" accept="image/png,image/jpeg" hidden onChange={pick('cover')} />
             </div>
 
             <div className={styles.headerBody}>
@@ -84,7 +85,7 @@ export default function ProfileHeader({ profile, onEdit, onAvatarChange, onCover
                 <button className={styles.photoLink} onClick={() => photoInput.current?.click()} disabled={busy === 'photo'}>
                     {busy === 'photo' ? 'Uploading…' : profile.avatar_url ? 'Change photo' : 'Add photo'}
                 </button>
-                <input ref={photoInput} type="file" accept="image/*" hidden onChange={pick('photo')} />
+                <input ref={photoInput} type="file" accept="image/png,image/jpeg" hidden onChange={pick('photo')} />
                 {error && <p className={styles.inlineError} role="alert">{error}</p>}
 
                 <h1 className={styles.name}>

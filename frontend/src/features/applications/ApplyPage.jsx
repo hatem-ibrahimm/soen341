@@ -3,14 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Alert, Button, Card, FilePicker, FormGrid, TextField } from '../../components/common'
 import { useCurrentUser } from '../../context/CurrentUserContext.jsx'
 import useResumes from '../../hooks/useResumes.js'
-import { findApplicationForJob, submitApplication } from '../../services/applicationApi.js'
+import { COVER_LETTER_MAX as COVER_MAX, findApplicationForJob, submitApplication } from '../../services/applicationApi.js'
 import { formatDate, formatFileSize } from '../../services/format.js'
 import { getJob } from '../../services/jobsApi.js'
+import { MULTIPLE_RESUMES, RESUME_ACCEPT } from '../../services/resumeApi.js'
 import JobSummaryCard from './JobSummaryCard.jsx'
 import styles from './Applications.module.css'
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
-const COVER_MAX = 3000
 
 // Route: /jobs/:jobId/apply  — the job listing's "Apply" button links here.
 export default function ApplyPage() {
@@ -131,13 +131,15 @@ export default function ApplyPage() {
                                     ))}
                                 </div>
                             )}
-                            <FilePicker
-                                accept=".pdf,.doc,.docx"
-                                onSelect={handleUpload}
-                                disabled={resumes.busyId === 'new'}
-                                label={resumes.busyId === 'new' ? 'Uploading…' : 'Upload a different resume'}
-                                hint="PDF, DOC or DOCX · 5 MB max · also saved to your profile"
-                            />
+                            {(MULTIPLE_RESUMES || resumes.resumes.length === 0) && (
+                                <FilePicker
+                                    accept={RESUME_ACCEPT}
+                                    onSelect={handleUpload}
+                                    disabled={resumes.busyId === 'new'}
+                                    label={resumes.busyId === 'new' ? 'Uploading…' : 'Upload a different resume'}
+                                    hint="PDF or DOC · 5 MB max · also saved to your profile"
+                                />
+                            )}
                         </Card>
 
                         <Card title="3. Cover letter (optional)">

@@ -47,8 +47,12 @@ export default function ApplicationCard({ app, resumeName, highlighted }) {
                         <dl className={styles.confirmFacts}>
                             <dt>Resume</dt>
                             <dd>{resumeName ?? 'Resume'}</dd>
-                            <dt>Cover letter</dt>
-                            <dd>{app.cover_letter ? <span className={styles.coverText}>{app.cover_letter}</span> : 'None'}</dd>
+                              {app.cover_letter && (
+                                <>
+                                    <dt>Cover letter</dt>
+                                    <dd><span className={styles.coverText}>{app.cover_letter}</span></dd>
+                                </>
+                                )}
                             <dt>Confirmation #</dt>
                             <dd><code>{confirmationNumber(app.id)}</code></dd>
                         </dl>

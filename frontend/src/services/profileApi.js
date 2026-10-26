@@ -2,27 +2,36 @@ import { request, USE_MOCK_API } from './apiClient.js'
 import { getUserId } from './session.js'
 import { delay, fileToDataUrl, newId, readDb, writeDb } from './mockStore.js'
 
-// Profile = personal info + experiences + education + skills.
-// Backend routes (US-02 already has GET/PUT /api/profiles/<id>):
-//   GET  /api/profiles/<id>              -> { profile, experiences, education, skills }
-//   PUT  /api/profiles/<id>              body: personal fields
-//   PUT  /api/profiles/<id>/experiences  body: { experiences: [...] }  (replace list)
-//   PUT  /api/profiles/<id>/education    body: { education: [...] }
-//   PUT  /api/profiles/<id>/skills       body: { skills: ["React", ...] }
-//   POST /api/profiles/<id>/avatar       multipart "file" -> { avatar_url }
-//   POST /api/profiles/<id>/cover        multipart "file" -> { cover_url }   (background image)
-//   DELETE /api/profiles/<id>/cover      -> back to the default grey background
+// Profile = personal info + photo (+ experiences, education, skills, background in sample-data mode).
+// Backend routes:
+//   GET/PUT /api/profiles/<id>                 -> { profile }  (personal info)
+//   GET     /api/profiles/<id>/picture         -> { url }      (404 = no photo)
+//   POST    /api/profiles/<id>/picture         multipart "picture" (JPG/PNG, max 2 MB)
+// Not in the backend yet: experiences, education, skills, background image.
+
+// Turn these on when the backend adds the matching routes.
+export const SECTIONS_SUPPORTED = USE_MOCK_API // experience, education, skills
+export const COVER_SUPPORTED = USE_MOCK_API // background image
 
 const base = () => `/api/profiles/${getUserId()}`
+
+async function getPictureUrl() {
+    try {
+        const data = await request(`${base()}/picture`)
+        return data.url ?? ''
+    } catch {
+        return '' // 404 = no photo uploaded yet
+    }
+}
 
 export async function getFullProfile() {
     if (USE_MOCK_API) {
         const { profile, experiences, education, skills } = readDb()
         return delay({ profile, experiences, education, skills })
     }
-    const data = await request(base())
+    const [data, avatar_url] = await Promise.all([request(base()), getPictureUrl()])
     return {
-        profile: data.profile,
+        profile: { ...data.profile, avatar_url, cover_url: '' },
         experiences: data.experiences ?? [],
         education: data.education ?? [],
         skills: data.skills ?? [],
@@ -49,40 +58,38 @@ function replaceList(key, items, prefix) {
         writeDb(db)
         return delay(db[key])
     }
-    return request(`${base()}/${key}`, { method: 'PUT', body: { [key]: items } }).then(
-        (data) => data[key],
-    )
+    return Promise.reject(new Error('Saving this section is not available yet.'))
 }
 
 export const updateExperiences = (items) => replaceList('experiences', items, 'exp')
 export const updateEducation = (items) => replaceList('education', items, 'edu')
 export const updateSkills = (items) => replaceList('skills', items, 'skill')
 
-// Shared by the profile picture and the background (cover) image.
-async function uploadImage(kind, file) {
-    const key = `${kind}_url` // avatar_url or cover_url
+export async function uploadAvatar(file) {
     if (USE_MOCK_API) {
         const db = readDb()
-        db.profile[key] = await fileToDataUrl(file)
+        db.profile.avatar_url = await fileToDataUrl(file)
         writeDb(db)
-        return delay(db.profile[key])
+        return delay(db.profile.avatar_url)
     }
     const formData = new FormData()
-    formData.append('file', file)
-    const data = await request(`${base()}/${kind}`, { method: 'POST', formData })
-    return data[key]
+    formData.append('picture', file)
+    await request(`${base()}/picture`, { method: 'POST', formData })
+    return getPictureUrl() // the upload returns a storage path; ask for a viewable link
 }
 
-export const uploadAvatar = (file) => uploadImage('avatar', file)
-export const uploadCover = (file) => uploadImage('cover', file)
+export async function uploadCover(file) {
+    if (!USE_MOCK_API) throw new Error('Background images are not available yet.')
+    const db = readDb()
+    db.profile.cover_url = await fileToDataUrl(file)
+    writeDb(db)
+    return delay(db.profile.cover_url)
+}
 
 export async function removeCover() {
-    if (USE_MOCK_API) {
-        const db = readDb()
-        db.profile.cover_url = ''
-        writeDb(db)
-        return delay('')
-    }
-    await request(`${base()}/cover`, { method: 'DELETE' })
-    return ''
+    if (!USE_MOCK_API) return ''
+    const db = readDb()
+    db.profile.cover_url = ''
+    writeDb(db)
+    return delay('')
 }

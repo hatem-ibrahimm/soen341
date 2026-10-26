@@ -20,7 +20,7 @@ function RegistrationForm() {
         const passwordError = validatePassword(password)
 
         if (passwordError) {
-            setError(error)
+            setError(passwordError)
             return
         }
         if (password !== confirmPassword) {

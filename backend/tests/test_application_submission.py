@@ -1,3 +1,9 @@
+"""Unit tests for the isolated Sprint 2 application-submission endpoint.
+
+These tests use mocks and do NOT demonstrate integration with Hatem's actual
+PostgreSQL schema; that integration must be verified separately.
+"""
+
 import unittest
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -7,7 +13,7 @@ from src.main.app import create_app
 
 
 USER_ID = "550e8400-e29b-41d4-a716-446655440000"
-JOB_ID = "8cb0abe6-2c39-45dc-a700-3cf2bd28592b"
+JOB_ID = 42
 RESUME_ID = "8cb0abe6-2c39-45dc-a700-3cf2bd28592c"
 APPLICATION_ID = "e4be1505-c45b-4f1c-9068-8dbd91a86dd5"
 
@@ -57,7 +63,7 @@ class SubmitApplicationTests(unittest.TestCase):
         self.connection.cursor.assert_not_called()
 
     def test_rejects_missing_or_invalid_job_id(self):
-        for payload in ({}, {"job_id": "not-a-uuid"}):
+        for payload in ({}, {"job_id": "not-a-number"}, {"job_id": -1}, {"job_id": False}, {"job_id": 2.5}):
             with self.subTest(payload=payload):
                 response = self._submit(payload)
                 self.assertEqual(response.status_code, 400)
@@ -75,13 +81,13 @@ class SubmitApplicationTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 400)
         self.connection.cursor.assert_not_called()
 
-    def test_job_must_exist_and_be_open(self):
+    def test_job_must_exist_and_be_published(self):
         self._rows(None)
         response = self._submit()
         self.assertEqual(response.status_code, 404)
         self.cursor.execute.assert_called_once_with(
-            "SELECT id FROM jobs WHERE id = %s AND status = %s",
-            (JOB_ID, "open"),
+            "SELECT id FROM public.jobs WHERE id = %s AND status = %s",
+            (JOB_ID, "published"),
         )
         self.connection.commit.assert_not_called()
         self.connection.close.assert_called_once()
@@ -100,6 +106,14 @@ class SubmitApplicationTests(unittest.TestCase):
         self.connection.commit.assert_called_once()
         self.cursor.close.assert_called_once()
         self.connection.close.assert_called_once()
+
+    def test_accepts_numeric_string_job_id_and_normalizes_it(self):
+        self._rows((JOB_ID,), self.application_row)
+        response = self._submit({"job_id": str(JOB_ID)})
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.get_json()["application"]["job_id"], JOB_ID)
+        sql, params = self.cursor.execute.call_args.args
+        self.assertEqual(params[1], JOB_ID)
 
     def test_success_with_owned_resume(self):
         row = (APPLICATION_ID, USER_ID, JOB_ID, RESUME_ID, "Applied", datetime.now(timezone.utc))

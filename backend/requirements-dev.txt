@@ -1,0 +1,4 @@
+-r requirements.txt
+# Test tools (used by CI and for running the tests locally).
+# test_job_search.py uses pytest fixtures; pytest also runs the unittest-style tests.
+pytest>=8.0,<10.0

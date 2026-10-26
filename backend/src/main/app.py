@@ -57,6 +57,7 @@ def create_app(test_config=None):
     app.config.from_mapping(
         SUPABASE_URL=os.getenv("SUPABASE_URL", ""),
         SUPABASE_KEY=os.getenv("SUPABASE_KEY", ""),
+        SUPABASE_SERVICE_KEY=os.getenv("SUPABASE_SERVICE_KEY", ""),
         DATABASE_URL=os.getenv("DATABASE_URL", ""),
         MIN_PASSWORD_LENGTH=int(os.getenv("MIN_PASSWORD_LENGTH", "8")),
         RESUME_BUCKET=os.getenv("SUPABASE_RESUME_BUCKET", "resumes"),
@@ -82,6 +83,22 @@ def create_app(test_config=None):
             app.config["SUPABASE_URL"],
             app.config["SUPABASE_KEY"],
         )
+
+    def get_storage_supabase():
+        factory = app.config.get("SUPABASE_CLIENT_FACTORY")
+
+        if factory:
+            return factory()
+
+        service_key = app.config.get("SUPABASE_SERVICE_KEY")
+
+        if not service_key:
+            return get_supabase()
+
+        if not app.config["SUPABASE_URL"]:
+            raise RuntimeError("SUPABASE_URL must be configured.")
+
+        return create_client(app.config["SUPABASE_URL"], service_key)
 
     def get_connection():
         factory = app.config.get("DB_CONNECTION_FACTORY")
@@ -567,7 +584,7 @@ def create_app(test_config=None):
                 return jsonify({"error": "Profile not found."}), 404
 
             old_path = row[0]
-            supabase = get_supabase()
+            supabase = get_storage_supabase()
 
             supabase.storage.from_(PICTURE_BUCKET).upload(
                 new_path,
@@ -610,7 +627,7 @@ def create_app(test_config=None):
 
             if uploaded:
                 try:
-                    get_supabase().storage.from_(PICTURE_BUCKET).remove(
+                    get_storage_supabase().storage.from_(PICTURE_BUCKET).remove(
                         [new_path]
                     )
                 except Exception:
@@ -662,7 +679,7 @@ def create_app(test_config=None):
                     {"error": "No profile picture has been uploaded."}
                 ), 404
 
-            response = get_supabase().storage.from_(
+            response = get_storage_supabase().storage.from_(
                 PICTURE_BUCKET
             ).create_signed_url(picture_path, 300)
 
@@ -740,7 +757,7 @@ def create_app(test_config=None):
             connection.commit()
 
             try:
-                get_supabase().storage.from_(PICTURE_BUCKET).remove(
+                get_storage_supabase().storage.from_(PICTURE_BUCKET).remove(
                     [picture_path]
                 )
             except Exception:
@@ -791,7 +808,7 @@ def create_app(test_config=None):
 
     def get_resume_storage():
         """Return the configured Supabase Storage bucket."""
-        return get_supabase().storage.from_(app.config["RESUME_BUCKET"])
+        return get_storage_supabase().storage.from_(app.config["RESUME_BUCKET"])
 
     def check_resume_access(profile_id):
         """Allow only the authenticated owner to manage a resume."""

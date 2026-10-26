@@ -1,10 +1,13 @@
 import os
 import re
 import uuid
+from pathlib import Path
 
+from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from supabase import create_client
+from werkzeug.utils import secure_filename
 from werkzeug.utils import secure_filename
 
 try:
@@ -14,6 +17,8 @@ except ImportError:
 
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 # Columns returned for a profile, in this order
 PROFILE_COLUMNS = [
@@ -484,6 +489,285 @@ def create_app(test_config=None):
                 connection.close()
 
 
+    # -------------------------
+    # Profile Picture Management
+    # -------------------------
+
+    MAX_PICTURE_SIZE = 2 * 1024 * 1024  # 2 MB
+    PICTURE_BUCKET = "profile-pictures"
+
+    def validate_picture(file):
+        """Validate the uploaded profile picture."""
+        if not file or not file.filename:
+            return None, None, "A profile picture is required."
+
+        filename = secure_filename(file.filename)
+        extension = os.path.splitext(filename)[1].lower()
+
+        if extension not in {".jpg", ".jpeg", ".png"}:
+            return None, None, "Only JPG, JPEG, and PNG images are allowed."
+
+        image_bytes = file.stream.read(MAX_PICTURE_SIZE + 1)
+
+        if not image_bytes:
+            return None, None, "The uploaded image is empty."
+
+        if len(image_bytes) > MAX_PICTURE_SIZE:
+            return None, None, "The image must be 2 MB or smaller."
+
+        if image_bytes.startswith(b"\xff\xd8\xff"):
+            content_type = "image/jpeg"
+        elif image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+            content_type = "image/png"
+        else:
+            return None, None, "The uploaded file is not a valid JPG or PNG image."
+
+        if extension == ".png" and content_type != "image/png":
+            return None, None, "The file extension does not match the image."
+
+        if extension in {".jpg", ".jpeg"} and content_type != "image/jpeg":
+            return None, None, "The file extension does not match the image."
+
+        return image_bytes, content_type, None
+
+    @app.post("/api/profiles/<profile_id>/picture")
+    @app.put("/api/profiles/<profile_id>/picture")
+    def upload_profile_picture(profile_id):
+        access_error = check_profile_access(profile_id)
+        if access_error:
+            return access_error
+
+        image_bytes, content_type, error = validate_picture(
+            request.files.get("picture")
+        )
+
+        if error:
+            return jsonify({"error": error}), 400
+
+        connection = None
+        cursor = None
+        new_path = f"{profile_id}/{uuid.uuid4().hex}"
+        uploaded = False
+
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                SELECT profile_picture_path
+                FROM profiles
+                WHERE id = %s
+                """,
+                (profile_id,),
+            )
+            row = cursor.fetchone()
+
+            if row is None:
+                return jsonify({"error": "Profile not found."}), 404
+
+            old_path = row[0]
+            supabase = get_supabase()
+
+            supabase.storage.from_(PICTURE_BUCKET).upload(
+                new_path,
+                image_bytes,
+                file_options={
+                    "content-type": content_type,
+                    "upsert": "false",
+                },
+            )
+            uploaded = True
+
+            cursor.execute(
+                """
+                UPDATE profiles
+                SET profile_picture_path = %s
+                WHERE id = %s
+                """,
+                (new_path, profile_id),
+            )
+            connection.commit()
+
+            if old_path:
+                try:
+                    supabase.storage.from_(PICTURE_BUCKET).remove([old_path])
+                except Exception:
+                    app.logger.warning(
+                        "Could not remove the previous profile picture."
+                    )
+
+            return jsonify(
+                {
+                    "message": "Profile picture uploaded successfully.",
+                    "profile_picture_path": new_path,
+                }
+            ), 200
+
+        except Exception:
+            if connection is not None:
+                connection.rollback()
+
+            if uploaded:
+                try:
+                    get_supabase().storage.from_(PICTURE_BUCKET).remove(
+                        [new_path]
+                    )
+                except Exception:
+                    app.logger.warning(
+                        "Could not clean up the uploaded profile picture."
+                    )
+
+            app.logger.exception("Profile picture upload failed")
+            return jsonify(
+                {"error": "Unable to upload the profile picture."}
+            ), 500
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if connection is not None:
+                connection.close()
+
+    @app.get("/api/profiles/<profile_id>/picture")
+    def get_profile_picture(profile_id):
+        access_error = check_profile_access(profile_id)
+        if access_error:
+            return access_error
+
+        connection = None
+        cursor = None
+
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                SELECT profile_picture_path
+                FROM profiles
+                WHERE id = %s
+                """,
+                (profile_id,),
+            )
+            row = cursor.fetchone()
+
+            if row is None:
+                return jsonify({"error": "Profile not found."}), 404
+
+            picture_path = row[0]
+
+            if not picture_path:
+                return jsonify(
+                    {"error": "No profile picture has been uploaded."}
+                ), 404
+
+            response = get_supabase().storage.from_(
+                PICTURE_BUCKET
+            ).create_signed_url(picture_path, 300)
+
+            if isinstance(response, dict):
+                signed_url = (
+                    response.get("signedURL")
+                    or response.get("signedUrl")
+                )
+            else:
+                signed_url = (
+                    getattr(response, "signed_url", None)
+                    or getattr(response, "signedURL", None)
+                )
+
+            if not signed_url:
+                return jsonify(
+                    {"error": "Unable to retrieve the profile picture."}
+                ), 500
+
+            return jsonify({"url": signed_url}), 200
+
+        except Exception:
+            app.logger.exception("Profile picture retrieval failed")
+            return jsonify(
+                {"error": "Unable to retrieve the profile picture."}
+            ), 500
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if connection is not None:
+                connection.close()
+
+    @app.delete("/api/profiles/<profile_id>/picture")
+    def delete_profile_picture(profile_id):
+        access_error = check_profile_access(profile_id)
+        if access_error:
+            return access_error
+
+        connection = None
+        cursor = None
+
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                SELECT profile_picture_path
+                FROM profiles
+                WHERE id = %s
+                """,
+                (profile_id,),
+            )
+            row = cursor.fetchone()
+
+            if row is None:
+                return jsonify({"error": "Profile not found."}), 404
+
+            picture_path = row[0]
+
+            if not picture_path:
+                return jsonify(
+                    {"error": "No profile picture to delete."}
+                ), 404
+
+            cursor.execute(
+                """
+                UPDATE profiles
+                SET profile_picture_path = NULL
+                WHERE id = %s
+                """,
+                (profile_id,),
+            )
+            connection.commit()
+
+            try:
+                get_supabase().storage.from_(PICTURE_BUCKET).remove(
+                    [picture_path]
+                )
+            except Exception:
+                app.logger.warning(
+                    "Could not remove the deleted picture from storage."
+                )
+
+            return jsonify(
+                {"message": "Profile picture deleted successfully."}
+            ), 200
+
+        except Exception:
+            if connection is not None:
+                connection.rollback()
+
+            app.logger.exception("Profile picture deletion failed")
+            return jsonify(
+                {"error": "Unable to delete the profile picture."}
+            ), 500
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if connection is not None:
+                connection.close()
+
+
     # Resume management
 
     RESUME_COLUMNS = [
@@ -556,7 +840,7 @@ def create_app(test_config=None):
                 400,
             )
 
-        # Read at most 10 MB plus one byte to detect oversized uploads.
+        
         file_bytes = file.stream.read(
             app.config["RESUME_MAX_SIZE"] + 1
         )
@@ -623,7 +907,7 @@ def create_app(test_config=None):
                 connection.rollback()
                 return jsonify({"error": "Resume not found."}), 404
 
-            # Give every uploaded file a unique storage path.
+            
             new_storage_path = (
                 f"{profile_id}/{uuid.uuid4().hex}"
                 f"{upload['extension']}"
@@ -688,13 +972,12 @@ def create_app(test_config=None):
             saved_row = cursor.fetchone()
             connection.commit()
 
-            # Delete the old file only after the replacement is saved.
+           
             if old_resume:
                 try:
                     storage.remove([old_resume["storage_path"]])
                 except Exception:
-                    # The database now points to the new resume.
-                    # A failed cleanup may leave an orphaned old file.
+                    
                     pass
 
             return jsonify({
@@ -710,7 +993,7 @@ def create_app(test_config=None):
             if connection is not None:
                 connection.rollback()
 
-            # Clean up the newly uploaded file if saving its metadata failed.
+            
             if new_storage_path:
                 try:
                     get_resume_storage().remove([new_storage_path])
@@ -849,6 +1132,223 @@ def create_app(test_config=None):
         finally:
             if connection is not None:
                 connection.close()
+
+
+    # -------------------------
+    # Job Search and Listings
+    # -------------------------
+
+    @app.get("/api/jobs")
+    def get_jobs():
+        connection = None
+        cursor = None
+
+        try:
+            # Read optional search filters.
+            keyword = request.args.get("keyword", "").strip()
+            location = request.args.get("location", "").strip()
+            category = request.args.get("category", "").strip()
+
+            # Read optional salary filters.
+            min_salary = request.args.get("min_salary")
+            max_salary = request.args.get("max_salary")
+
+            try:
+                min_salary = (
+                    float(min_salary) if min_salary else None
+                )
+                max_salary = (
+                    float(max_salary) if max_salary else None
+                )
+
+                # Salary values must be finite and non-negative.
+                import math
+
+                if (
+                    (min_salary is not None and
+                     (not math.isfinite(min_salary) or min_salary < 0))
+                    or
+                    (max_salary is not None and
+                     (not math.isfinite(max_salary) or max_salary < 0))
+                ):
+                    raise ValueError
+
+            except ValueError:
+                return jsonify({
+                    "error": "Salary filters must be valid, non-negative numbers."
+                }), 400
+
+            if (
+                min_salary is not None
+                and max_salary is not None
+                and min_salary > max_salary
+            ):
+                return jsonify({
+                    "error": "Minimum salary cannot exceed maximum salary."
+                }), 400
+
+            # Retrieve published jobs.
+            query = """
+                SELECT id, title, company_name, location,
+                       category, description, min_salary,
+                       max_salary, created_at
+                FROM public.jobs
+                WHERE status = 'published'
+            """
+            params = []
+
+            # Search across the main job fields.
+            if keyword:
+                query += """
+                    AND (
+                        title ILIKE %s
+                        OR company_name ILIKE %s
+                        OR description ILIKE %s
+                        OR location ILIKE %s
+                        OR category ILIKE %s
+                    )
+                """
+                search_term = f"%{keyword}%"
+                params.extend([search_term] * 5)
+
+            # Optional location filter.
+            if location:
+                query += " AND location ILIKE %s"
+                params.append(f"%{location}%")
+
+            # Optional category filter.
+            if category:
+                query += " AND category ILIKE %s"
+                params.append(f"%{category}%")
+
+            # Include jobs whose salary ranges overlap the
+            # requested range. NULL means the bound is unspecified.
+            if min_salary is not None:
+                query += """
+                    AND (max_salary IS NULL OR max_salary >= %s)
+                """
+                params.append(min_salary)
+
+            if max_salary is not None:
+                query += """
+                    AND (min_salary IS NULL OR min_salary <= %s)
+                """
+                params.append(max_salary)
+
+            query += " ORDER BY created_at DESC"
+
+            connection = get_connection()
+            cursor = connection.cursor()
+            cursor.execute(query, tuple(params))
+
+            columns = [column[0] for column in cursor.description]
+            jobs = [
+                dict(zip(columns, row))
+                for row in cursor.fetchall()
+            ]
+
+            # Convert salary values to JSON-friendly numbers.
+            for job in jobs:
+                if job["min_salary"] is not None:
+                    job["min_salary"] = float(job["min_salary"])
+                if job["max_salary"] is not None:
+                    job["max_salary"] = float(job["max_salary"])
+
+            return jsonify({"jobs": jobs}), 200
+
+        except Exception:
+            app.logger.exception("Job listing retrieval failed")
+            return jsonify({
+                "error": "Unable to retrieve jobs at this time."
+            }), 500
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+
+            if connection is not None:
+                connection.close()
+
+    @app.get("/api/jobs/<int:job_id>")
+    def get_job_details(job_id):
+        connection = None
+        cursor = None
+
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                SELECT id, title, company_name, location,
+                       category, description, min_salary,
+                       max_salary, created_at
+                FROM public.jobs
+                WHERE id = %s AND status = 'published'
+                """,
+                (job_id,)
+            )
+
+            row = cursor.fetchone()
+
+            if row is None:
+                return jsonify({
+                    "error": "Job not found."
+                }), 404
+
+            columns = [column[0] for column in cursor.description]
+            job = dict(zip(columns, row))
+
+            # Convert salary values to JSON-friendly numbers.
+            if job["min_salary"] is not None:
+                job["min_salary"] = float(job["min_salary"])
+            if job["max_salary"] is not None:
+                job["max_salary"] = float(job["max_salary"])
+
+            return jsonify({"job": job}), 200
+
+        except Exception:
+            app.logger.exception("Job details retrieval failed")
+            return jsonify({
+                "error": "Unable to retrieve job details at this time."
+            }), 500
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+
+            if connection is not None:
+                connection.close()
+
+  
+    if __package__:
+        from .application_submission import register_application_submission_routes
+    else:
+        from application_submission import register_application_submission_routes
+
+    register_application_submission_routes(
+        app, get_connection, get_current_user
+    )
+
+
+    if __package__:
+        from .application_tracking import register_application_tracking_routes
+    else:
+        from application_tracking import register_application_tracking_routes
+
+    register_application_tracking_routes(
+        app, get_connection, get_current_user
+    )
+
+
+    if __package__:
+        from .recruiter_postings import register_recruiter_posting_routes
+    else:
+        from recruiter_postings import register_recruiter_posting_routes
+
+    register_recruiter_posting_routes(
+        app, get_connection, get_current_user
+    )
 
     return app
 

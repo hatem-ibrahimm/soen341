@@ -44,7 +44,15 @@ function JobCard({ job, search = '' }) {
                 <p>Required skills not provided.</p>
             )}
 
-            <Link to={detailsTo}>View job details</Link>
+            <div className="job-card-actions">
+                <Link to={detailsTo}>View job details</Link>
+                <Link
+                    to={`/jobs/${encodeURIComponent(job.id)}/apply`}
+                    className="job-apply-link"
+                >
+                    Apply
+                </Link>
+            </div>
         </article>
     )
 }

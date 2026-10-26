@@ -1,77 +1,13 @@
+import { MOCK_JOBS } from './mockStore.js'
+
 export const JOBS_DATA_MODE = 'mock'
 
-const JOBS = [
-    {
-        id: 'frontend-engineer-northstar',
-        title: 'Frontend Engineer',
-        company_name: 'Northstar Labs',
-        location: 'Montreal, QC',
-        category: 'Engineering',
-        salary_min: 90000,
-        salary_max: 125000,
-        company_description:
-            'Northstar Labs builds accessible tools for teams working across the web.',
-        description:
-            'Build and maintain responsive interfaces with a product-focused engineering team.',
-        required_skills: ['React', 'JavaScript', 'Accessibility'],
-    },
-    {
-        id: 'product-designer-maple',
-        title: 'Product Designer',
-        company_name: 'Maple Works',
-        location: 'Toronto, ON',
-        category: 'Design',
-        salary_min: 80000,
-        salary_max: 110000,
-        company_description:
-            'Maple Works helps small businesses organize their day-to-day operations.',
-        description:
-            'Research user needs and turn them into clear, thoughtful product experiences.',
-        required_skills: ['Figma', 'User research', 'Prototyping'],
-    },
-    {
-        id: 'backend-developer-cedar',
-        title: 'Backend Developer',
-        company_name: 'Cedar Systems',
-        location: 'Remote',
-        category: 'Engineering',
-        salary_min: 100000,
-        salary_max: 145000,
-        company_description:
-            'Cedar Systems creates dependable data services for growing businesses.',
-        description:
-            'Design APIs and services, improve reliability, and collaborate across product teams.',
-        required_skills: ['Python', 'REST APIs', 'PostgreSQL'],
-    },
-    {
-        id: 'data-analyst-lantern',
-        title: 'Data Analyst',
-        company_name: 'Lantern Analytics',
-        location: 'Vancouver, BC',
-        category: 'Data',
-        salary_min: 75000,
-        salary_max: 105000,
-        company_description:
-            'Lantern Analytics turns complex information into practical business insights.',
-        description:
-            'Explore datasets, communicate findings, and help teams make informed decisions.',
-        required_skills: ['SQL', 'Python', 'Data visualization'],
-    },
-    {
-        id: 'full-stack-engineer-harbor',
-        title: 'Full Stack Engineer',
-        company_name: 'Harbor Digital',
-        location: 'Ottawa, ON',
-        category: 'Engineering',
-        salary_min: 95000,
-        salary_max: 135000,
-        company_description:
-            'Harbor Digital partners with organizations to deliver useful digital services.',
-        description:
-            'Ship frontend and backend improvements and help shape a maintainable platform.',
-        required_skills: ['React', 'Node.js', 'SQL'],
-    },
-]
+const JOBS = MOCK_JOBS.map((job) => ({
+    ...job,
+    company_name: job.company_name ?? job.company,
+    category: job.category ?? job.type,
+    required_skills: job.required_skills ?? [],
+}))
 
 const FILTER_KEYS = [
     'keyword',
@@ -185,11 +121,19 @@ function matchesJob(job, filters) {
         return false
     }
 
-    if (salaryMin && job.salary_max < Number(salaryMin)) {
+    if (
+        salaryMin &&
+        job.salary_max != null &&
+        job.salary_max < Number(salaryMin)
+    ) {
         return false
     }
 
-    if (salaryMax && job.salary_min > Number(salaryMax)) {
+    if (
+        salaryMax &&
+        job.salary_min != null &&
+        job.salary_min > Number(salaryMax)
+    ) {
         return false
     }
 
@@ -211,6 +155,8 @@ export async function getJob(jobId) {
 }
 
 export function formatJobSalary(job) {
+    if (job.salary) return job.salary
+
     const formatter = new Intl.NumberFormat('en-CA', {
         style: 'currency',
         currency: 'CAD',

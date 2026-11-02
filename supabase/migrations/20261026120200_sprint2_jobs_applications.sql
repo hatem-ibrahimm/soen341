@@ -38,6 +38,9 @@ CREATE TABLE IF NOT EXISTS public.jobs (
     CHECK (min_salary IS NULL OR max_salary IS NULL OR max_salary >= min_salary)
 );
 
+ALTER TABLE public.jobs
+  ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'draft';
+
 CREATE INDEX IF NOT EXISTS jobs_recruiter_id_idx
   ON public.jobs (recruiter_id);
 -- job search: published jobs, newest first

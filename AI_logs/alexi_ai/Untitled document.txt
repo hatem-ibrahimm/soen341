@@ -1,4 +1,58 @@
-﻿Task ID/Title: Front end setup
+﻿SPRINT 2:
+Task ID/Title: Sprint 2 — Draft frontend user stories, tasks, acceptance criteria, and dependencies
+
+Purpose of AI Use:
+Use AI to organize the provided project requirements into proposed GitHub issues for authentication changes, profiles, job search, applications, and the recruiter dashboard.
+
+Chat Link or Prompt/Response:
+Attach the conversation link if available. Otherwise, include the complete user prompt and this response in the report appendix.
+
+AI-Suggested Content:
+Generated 21 proposed issues with user stories, descriptions, acceptance criteria, priorities, story-point estimates, sprint assignments, dependencies, and implementation notes. Identified an ambiguity in the requested password rule and highlighted the need for separate acceptance-test issues.
+
+Reflection:
+AI helped break the feature list into manageable proposed issues and identify integration questions. The estimates and technical assumptions still require team review; this interaction did not inspect the repository or verify working code.
+
+Task ID/Title: Sprint 2 — Review existing React code and draft authentication/profile fixes
+
+Purpose of AI Use:
+Review supplied frontend files, identify integration problems, and propose changes supporting Sprint 2 work.
+
+Chat Link or Prompt/Response:
+Attach this conversation link if available; otherwise include the full prompt and relevant response in the report appendix.
+
+AI-Suggested Content:
+Identified the token/accessToken mismatch, string-only user-ID handling, and unsaved professional-profile fields. Generated shared password-validation code, targeted component edits, and a proposed file structure for job search and the recruiter dashboard.
+
+Validation:
+Static review of the supplied code and consultation of official React and MDN documentation. No code was executed, backend behavior verified, or automated tests run. Team validation should cover password cases, existing-account compatibility, login response shape, profile loading, and persistence after refresh.
+
+Reflection:
+Reviewing existing code exposed authentication and persistence inconsistencies before adding new features. Backend contracts and the exact password policy remain unconfirmed.
+
+Task ID/Title: Sprint 2— Implement job-search frontend and recruiter dashboard prototype
+
+Purpose of AI Use:
+Generate an implementation plan, pseudocode, React components, service functions, shared filtering helpers, styles, and validation scenarios.
+
+Chat Link or Prompt/Response:
+Attach this conversation link if available. Otherwise include the complete prompt and relevant response in the report appendix.
+
+AI-Suggested Content:
+Generated mock job data, a switchable job service, keyword/location/category/salary filtering, job cards, job details, URL-based search preservation, a recruiter posting preview, route integration, and manual test cases.
+
+Validation:
+Compared the implementation against the supplied project requirements and existing frontend structure. Consulted official React and React Router documentation for effect cleanup and URL state. The code has not been executed or tested against your repository or backend. Validate compilation, styling interactions, search cases, navigation, and API contracts before merging.
+
+Decision:
+Pending review and execution. Record Accepted, Modified before use, or Rejected after team validation.
+
+Reflection:
+The service boundary allows frontend work to progress before job endpoints exist. Explicit mock-data and preview labels prevent incomplete backend features from being represented as finished functionality.
+
+SPRINT 1:
+
+Task ID/Title: Front end setup
 
 Purpose of AI Use: AI was used to brainstorm different solutions of implementation for the front end and the structure it will have
 

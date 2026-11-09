@@ -11,7 +11,7 @@ export default function AppLayout() {
             <header className={styles.topbar}>
                 <div className={styles.inner}>
                     <Link to="/jobs" className={styles.brand}>
-                        CarrerConnect
+                        CareerConnect
                     </Link>
                     <nav className={styles.nav} aria-label="Main">
                         <NavLink to="/jobs" className={navClass}>

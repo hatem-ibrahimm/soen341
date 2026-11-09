@@ -5,13 +5,29 @@
 }
 .banner code { background: rgba(0,0,0,0.06); padding: 1px 5px; border-radius: 4px; }
 .h1 { font-size: 1.35rem; margin: 0 0 12px; }
-.searchLabel { display: block; margin-bottom: 6px; font-weight: 600; }
-.searchInput {
-  box-sizing: border-box; width: 100%; margin-bottom: 16px; padding: 10px 12px;
+.searchForm {
+  margin-bottom: 16px; padding: 18px; border: 1px solid var(--cc-border);
+  border-radius: var(--cc-radius-sm); background: var(--cc-surface);
+}
+.filterGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.filterField { min-width: 0; }
+.filterField label { display: block; margin-bottom: 6px; font-weight: 600; }
+.filterField input {
+  box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px;
   border: 1px solid var(--cc-border); border-radius: var(--cc-radius-sm);
   background: var(--cc-surface); color: var(--cc-text); font: inherit;
 }
-.searchInput:focus-visible { outline: 2px solid var(--cc-primary); outline-offset: 2px; }
+.filterField input[aria-invalid="true"] { border: 2px solid #a31515; }
+.fieldError { margin: 6px 0 0; color: #a31515; }
+.filterHint { margin: 14px 0; color: var(--cc-muted); font-size: 0.9rem; }
+.searchActions { display: flex; flex-wrap: wrap; gap: 12px; }
+.searchActions button {
+  min-height: 44px; padding: 10px 16px; border: 1px solid var(--cc-primary);
+  border-radius: var(--cc-radius-sm); background: var(--cc-primary);
+  color: #fff; font: inherit; font-weight: 600; cursor: pointer;
+}
+.searchActions .clearButton { background: var(--cc-surface); color: var(--cc-primary); }
+.searchForm :focus-visible { outline: 3px solid var(--cc-primary); outline-offset: 2px; }
 .listCard { padding: 0 !important; }
 .list { list-style: none; margin: 0; padding: 0; }
 .emptyState { margin: 0; padding: 20px; color: var(--cc-muted); }
@@ -34,3 +50,4 @@
 .back { display: inline-block; margin-bottom: 12px; color: var(--cc-muted); text-decoration: none; font-weight: 600; font-size: 0.9rem; }
 .back:hover { color: var(--cc-text); }
 .detailActions { display: flex; justify-content: flex-end; margin-top: 16px; }
+@media (max-width: 520px) { .searchActions button { width: 100%; } }

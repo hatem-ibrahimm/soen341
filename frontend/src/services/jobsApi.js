@@ -28,6 +28,8 @@ export function toJob(raw) {
         type: raw.category,
         category: raw.category,
         salary: formatSalary(raw.min_salary, raw.max_salary),
+        min_salary: raw.min_salary,
+        max_salary: raw.max_salary,
         posted_at: raw.created_at,
         description: raw.description,
     }

@@ -160,19 +160,52 @@ class ApplicationTrackingTests(unittest.TestCase):
         updated_row = (
             APPLICATION_ID, APPLICANT_ID, JOB_ID, None, "Interview", CREATED_AT,
         )
-        self.cursor.fetchone.return_value = updated_row
+        # First fetchone() returns the previous status.
+        # Second fetchone() returns the updated application.
+        self.cursor.fetchone.side_effect = [
+            ("Applied",),
+            updated_row,
+            ("applicant@example.com",)
+        ]
         response = self.client.patch(
             f"/api/applications/{APPLICATION_ID}/status",
-            json={"status": "Interview"}, headers=self.headers,
+            json={"status": "Interview"},
+            headers=self.headers,
         )
+        # Check that the request was successful.
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get_json()["application"]["status"], "Interview")
-        sql, parameters = self.cursor.execute.call_args.args
-        self.assertIn("UPDATE applications AS a", sql)
-        self.assertIn("j.recruiter_id = %s", sql)
-        self.assertEqual(parameters, ("Interview", APPLICATION_ID, RECRUITER_ID))
+        self.assertEqual(
+            response.get_json()["application"]["status"],
+            "Interview",
+        )
+        # Check the application UPDATE query.
+        update_call = self.cursor.execute.call_args_list[1]
+        update_sql, update_parameters = update_call.args
+
+        self.assertIn("UPDATE applications AS a", update_sql)
+        self.assertIn("j.recruiter_id = %s", update_sql)
+        self.assertEqual(
+            update_parameters,
+            ("Interview", APPLICATION_ID, RECRUITER_ID),
+        )
+        # Check that a notification was created.
+        notification_call = self.cursor.execute.call_args_list[2]
+        notification_sql, notification_parameters = notification_call.args
+
+        self.assertIn("INSERT INTO notifications", notification_sql)
+        self.assertEqual(
+            notification_parameters,
+            (
+                APPLICANT_ID,
+                APPLICATION_ID,
+                "application_status",
+                "Application Status Updated",
+                "Your application status has changed to Interview.",
+            ),
+        )
+        # Check that changes were committed and the connection closed.
         self.connection.commit.assert_called_once()
-        self.connection.close.assert_called_once()
+        self.assertEqual(self.connection.close.call_count, 2)
 
     def test_unrelated_account_cannot_change_application_status(self):
         self.current_user_id = RECRUITER_ID
@@ -202,6 +235,94 @@ class ApplicationTrackingTests(unittest.TestCase):
         self.connection.rollback.assert_called_once()
         self.connection.close.assert_called_once()
 
+    def test_same_status_does_not_create_notification(self):
+        self.current_user_id = RECRUITER_ID
+
+        updated_row = (
+            APPLICATION_ID, APPLICANT_ID, JOB_ID, None, "Interview", CREATED_AT,
+        )
+
+        # The application was already in Interview status.
+        self.cursor.fetchone.side_effect = [
+            ("Interview",),
+            updated_row,
+        ]
+
+        response = self.client.patch(
+            f"/api/applications/{APPLICATION_ID}/status",
+            json={"status": "Interview"},
+            headers=self.headers,
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        # No new notification should be inserted.
+        queries = [
+            call.args[0]
+            for call in self.cursor.execute.call_args_list
+        ]
+
+        self.assertFalse(
+            any("INSERT INTO notifications" in sql for sql in queries)
+        )
+
+        self.connection.commit.assert_called_once()
+
+    def test_unauthorized_recruiter_cannot_create_notification(self):
+        self.current_user_id = RECRUITER_ID
+
+        # No application is found for this recruiter.
+        self.cursor.fetchone.return_value = None
+
+        response = self.client.patch(
+            f"/api/applications/{APPLICATION_ID}/status",
+            json={"status": "Offered"},
+            headers=self.headers,
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+        queries = [
+            call.args[0]
+            for call in self.cursor.execute.call_args_list
+        ]
+
+        self.assertFalse(
+            any("INSERT INTO notifications" in sql for sql in queries)
+        )
+
+        self.connection.commit.assert_not_called()
+        self.connection.rollback.assert_called_once()
+
+    def test_notification_failure_rolls_back_status_update(self):
+        self.current_user_id = RECRUITER_ID
+
+        updated_row = (
+            APPLICATION_ID, APPLICANT_ID, JOB_ID, None, "Interview", CREATED_AT,
+        )
+
+        self.cursor.fetchone.side_effect = [
+            ("Applied",),
+            updated_row,
+        ]
+
+        # Simulate a database error when inserting the notification.
+        def execute_query(sql, parameters):
+            if "INSERT INTO notifications" in sql:
+                raise RuntimeError("Notification insert failed")
+
+        self.cursor.execute.side_effect = execute_query
+
+        response = self.client.patch(
+            f"/api/applications/{APPLICATION_ID}/status",
+            json={"status": "Interview"},
+            headers=self.headers,
+        )
+
+        self.assertEqual(response.status_code, 500)
+        self.connection.rollback.assert_called_once()
+        self.connection.commit.assert_not_called()
+        self.connection.close.assert_called_once()
 
 if __name__ == "__main__":
     unittest.main()

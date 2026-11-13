@@ -1367,6 +1367,16 @@ def create_app(test_config=None):
         app, get_connection, get_current_user
     )
 
+
+    if __package__:
+        from .notifications import register_notification_routes
+    else:
+        from notifications import register_notification_routes
+
+    register_notification_routes(
+        app, get_connection, get_current_user
+    )
+
     return app
 
 

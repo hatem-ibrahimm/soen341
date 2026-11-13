@@ -165,6 +165,7 @@ class ApplicationTrackingTests(unittest.TestCase):
         self.cursor.fetchone.side_effect = [
             ("Applied",),
             updated_row,
+            ("applicant@example.com",)
         ]
         response = self.client.patch(
             f"/api/applications/{APPLICATION_ID}/status",
@@ -204,7 +205,7 @@ class ApplicationTrackingTests(unittest.TestCase):
         )
         # Check that changes were committed and the connection closed.
         self.connection.commit.assert_called_once()
-        self.connection.close.assert_called_once()
+        self.assertEqual(self.connection.close.call_count, 2)
 
     def test_unrelated_account_cannot_change_application_status(self):
         self.current_user_id = RECRUITER_ID

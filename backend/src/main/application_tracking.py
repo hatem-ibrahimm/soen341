@@ -2,7 +2,7 @@
 import uuid
 
 from flask import jsonify, request
-
+from src.main.email_service import send_email
 
 APPLICATION_STATUSES = frozenset(
     ("Applied", "Under Review", "Interview", "Offered", "Rejected")
@@ -23,7 +23,7 @@ def _is_uuid(value):
 
 
 def _application_dict(row):
-    """Serialize the same columns returned by Issue #41's submit endpoint."""
+    """Convert a database application row into a JSON-friendly dictionary."""
     created_at = row[5]
     return {
         "id": str(row[0]),
@@ -40,7 +40,7 @@ def _application_dict(row):
 
 
 def _page_integer(name, default, minimum, maximum):
-    """Return (value, error), rejecting malformed and out-of-range query args."""
+    """Validate pagination parameters."""
     raw = request.args.get(name)
     if raw is None:
         return default, None
@@ -53,11 +53,10 @@ def _page_integer(name, default, minimum, maximum):
 
 
 def register_application_tracking_routes(app, get_connection, get_current_user):
-    """Attach issue #42 routes using the existing auth and DB helpers."""
+    """Register application tracking endpoints."""
 
     @app.get("/api/applications")
     def list_my_applications():
-        """Only return applications owned by the authenticated job seeker."""
         user = get_current_user()
         if user is None:
             return jsonify({"error": "Authentication required."}), 401
@@ -114,6 +113,7 @@ def register_application_tracking_routes(app, get_connection, get_current_user):
                     "has_more": len(rows) > limit,
                 },
             }), 200
+
         except Exception:
             app.logger.exception("Application list retrieval failed")
             return jsonify({"error": "Unable to retrieve applications."}), 500
@@ -125,10 +125,10 @@ def register_application_tracking_routes(app, get_connection, get_current_user):
 
     @app.get("/api/applications/<application_id>")
     def get_my_application(application_id):
-        """Do not disclose a different applicant's application."""
         user = get_current_user()
         if user is None:
             return jsonify({"error": "Authentication required."}), 401
+
         if not _is_uuid(application_id):
             return jsonify({"error": "Invalid application ID."}), 400
 
@@ -165,11 +165,7 @@ def register_application_tracking_routes(app, get_connection, get_current_user):
 
     @app.patch("/api/applications/<application_id>/status")
     def update_application_status(application_id):
-        """Allow only the recruiter who owns the job to change its status.
-
-        Authorization is enforced by the SQL queries so an unrelated user
-        cannot change another recruiter's application.
-        """
+        """Update an application and notify the applicant of status changes."""
         user = get_current_user()
         if user is None:
             return jsonify({"error": "Authentication required."}), 401
@@ -195,8 +191,7 @@ def register_application_tracking_routes(app, get_connection, get_current_user):
             conn = get_connection()
             cursor = conn.cursor()
 
-            # Check the previous status and lock the application row.
-            # Only the recruiter who owns the job can access it.
+            # Verify recruiter ownership and retrieve previous status.
             cursor.execute(
                 """
                 SELECT a.status
@@ -217,7 +212,7 @@ def register_application_tracking_routes(app, get_connection, get_current_user):
 
             previous_status = previous_row[0]
 
-            # Update the application status.
+            # Update application status.
             cursor.execute(
                 """
                 UPDATE applications AS a
@@ -236,11 +231,12 @@ def register_application_tracking_routes(app, get_connection, get_current_user):
 
             if row is None:
                 conn.rollback()
-                # Do not reveal whether another recruiter's application exists.
                 return jsonify({"error": "Application not found."}), 404
 
-            # Create a notification only if the status actually changed.
-            if previous_status != status:
+            status_changed = previous_status != status
+
+            # Create in-app notification only when status changes.
+            if status_changed:
                 cursor.execute(
                     """
                     INSERT INTO notifications (
@@ -261,13 +257,13 @@ def register_application_tracking_routes(app, get_connection, get_current_user):
                     ),
                 )
 
-            # Save the status update and notification together.
+            # Save database changes before attempting email.
             conn.commit()
 
-            return jsonify({
+            response_data = {
                 "message": "Application status updated successfully.",
                 "application": _application_dict(row),
-            }), 200
+            }
 
         except Exception:
             if conn is not None:
@@ -280,3 +276,46 @@ def register_application_tracking_routes(app, get_connection, get_current_user):
                 cursor.close()
             if conn is not None:
                 conn.close()
+
+        # EMAIL FEATURE
+        # Email errors must never undo the successful status update.
+        if status_changed:
+            email_conn = None
+            email_cursor = None
+
+            try:
+                email_conn = get_connection()
+                email_cursor = email_conn.cursor()
+
+                # Retrieve the applicant's email from their profile.
+                email_cursor.execute(
+                    """
+                    SELECT email
+                    FROM profiles
+                    WHERE id = %s
+                    """,
+                    (str(row[1]),),
+                )
+
+                email_row = email_cursor.fetchone()
+
+                if email_row and isinstance(email_row[0], str) and email_row[0]:
+                    send_email(
+                        email_row[0],
+                        "CareerConnect - Application Status Updated",
+                        f"Your application status has changed to {status}.",
+                    )
+
+            except Exception:
+                app.logger.warning(
+                    "Optional status update email could not be sent.",
+                    exc_info=True,
+                )
+
+            finally:
+                if email_cursor is not None:
+                    email_cursor.close()
+                if email_conn is not None:
+                    email_conn.close()
+
+        return jsonify(response_data), 200

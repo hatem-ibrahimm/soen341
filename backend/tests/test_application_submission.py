@@ -115,6 +115,7 @@ class SubmitApplicationTests(unittest.TestCase):
         self._rows(
             (JOB_ID, RECRUITER_ID),
             self.application_row,
+            ("recruiter@example.com",),
         )
 
         response = self._submit({
@@ -136,7 +137,7 @@ class SubmitApplicationTests(unittest.TestCase):
         )
 
         # Job lookup, application insert, notification insert.
-        self.assertEqual(self.cursor.execute.call_count, 3)
+        self.assertEqual(self.cursor.execute.call_count, 4)
 
         application_sql, application_params = (
             self.cursor.execute.call_args_list[1].args
@@ -149,8 +150,8 @@ class SubmitApplicationTests(unittest.TestCase):
         )
 
         self.connection.commit.assert_called_once()
-        self.cursor.close.assert_called_once()
-        self.connection.close.assert_called_once()
+        self.assertEqual(self.cursor.close.call_count, 2)
+        self.assertEqual(self.connection.close.call_count, 2)
 
     def test_accepts_numeric_string_job_id_and_normalizes_it(self):
         self._rows(
@@ -185,6 +186,7 @@ class SubmitApplicationTests(unittest.TestCase):
             (JOB_ID, RECRUITER_ID),
             (RESUME_ID,),
             row,
+            ("recruiter@example.com",),
         )
 
         response = self._submit({
@@ -195,7 +197,7 @@ class SubmitApplicationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
 
         # Job lookup, resume lookup, application insert, notification insert.
-        self.assertEqual(self.cursor.execute.call_count, 4)
+        self.assertEqual(self.cursor.execute.call_count, 5)
 
         resume_sql, resume_params = (
             self.cursor.execute.call_args_list[1].args

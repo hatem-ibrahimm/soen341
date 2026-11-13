@@ -2,6 +2,7 @@
 import uuid
 
 from flask import jsonify, request
+from src.main.email_service import send_email
 
 
 MAX_COVER_LETTER_LENGTH = 2000
@@ -18,10 +19,7 @@ def _valid_uuid(value):
 
 
 def _parse_job_id(value):
-    """Return a positive PostgreSQL job ID, or None for invalid inputs.
-
-    The latest team job-listing API uses /api/jobs/<int:job_id>.
-    """
+    """Return a positive PostgreSQL job ID, or None for invalid inputs."""
     if isinstance(value, bool):
         return None
     if isinstance(value, int):
@@ -34,7 +32,7 @@ def _parse_job_id(value):
 
 
 def _format_application(row):
-    """Map the agreed SQL result columns to an API-friendly response."""
+    """Map the SQL result columns to an API-friendly response."""
     submitted_at = row[5]
     return {
         "id": str(row[0]),
@@ -55,8 +53,6 @@ def register_application_submission_routes(app, get_connection, get_current_user
 
     @app.post("/api/applications")
     def submit_job_application():
-        # Don't trust an applicant/user identifier from the request body.
-        # Reuse Supabase Auth token validation already in this repository.
         user = get_current_user()
         if user is None:
             return jsonify({"error": "Authentication required."}), 401
@@ -77,7 +73,9 @@ def register_application_submission_routes(app, get_connection, get_current_user
             return jsonify({"error": "cover_letter must be text."}), 400
         cover_letter = cover_letter.strip()
         if len(cover_letter) > MAX_COVER_LETTER_LENGTH:
-            return jsonify({"error": "cover_letter must be 2000 characters or fewer."}), 400
+            return jsonify({
+                "error": "cover_letter must be 2000 characters or fewer."
+            }), 400
 
         applicant_id = str(user.id)
         if not _valid_uuid(applicant_id):
@@ -90,8 +88,7 @@ def register_application_submission_routes(app, get_connection, get_current_user
             conn = get_connection()
             cursor = conn.cursor()
 
-            # Check that the job is published.
-            # Also retrieve the recruiter who owns the job.
+            # Check that the job is published and retrieve its recruiter.
             cursor.execute(
                 """
                 SELECT id, recruiter_id
@@ -110,7 +107,7 @@ def register_application_submission_routes(app, get_connection, get_current_user
 
             recruiter_id = job_row[1]
 
-            # The optional resume must belong to the authenticated user.
+            # Validate that the optional resume belongs to the applicant.
             if resume_id is not None:
                 cursor.execute(
                     """
@@ -124,8 +121,8 @@ def register_application_submission_routes(app, get_connection, get_current_user
                     return jsonify({
                         "error": "Resume not found for this account."
                     }), 404
-            # Insert the new job application.
-            # The database must enforce UNIQUE(applicant_id, job_id).
+
+            # Insert the application.
             cursor.execute(
                 """
                 INSERT INTO applications (
@@ -149,7 +146,7 @@ def register_application_submission_routes(app, get_connection, get_current_user
             )
             row = cursor.fetchone()
 
-            # Notify the recruiter about the application.
+            # Create the recruiter's in-app notification.
             cursor.execute(
                 """
                 INSERT INTO notifications (
@@ -169,13 +166,15 @@ def register_application_submission_routes(app, get_connection, get_current_user
                     "A candidate has submitted an application for your job posting.",
                 ),
             )
-            # Save the application and notification together.
+
+            # Commit the application and notification together.
             conn.commit()
 
-            return jsonify({
+            response_data = {
                 "message": "Application submitted successfully.",
                 "application": _format_application(row),
-            }), 201
+            }
+
         except Exception as exc:
             if conn is not None:
                 conn.rollback()
@@ -192,3 +191,44 @@ def register_application_submission_routes(app, get_connection, get_current_user
                 cursor.close()
             if conn is not None:
                 conn.close()
+        # EMAIL FEATURE
+        # Email failures must not affect successful application submissions.
+        email_conn = None
+        email_cursor = None
+
+        try:
+            email_conn = get_connection()
+            email_cursor = email_conn.cursor()
+
+            # Look up the recruiter's email address.
+            email_cursor.execute(
+                """
+                SELECT email
+                FROM profiles
+                WHERE id = %s
+                """,
+                (str(recruiter_id),),
+            )
+
+            email_row = email_cursor.fetchone()
+
+            if email_row and isinstance(email_row[0], str) and email_row[0]:
+                send_email(
+                    email_row[0],
+                    "CareerConnect - New Job Application",
+                    "A candidate has submitted an application for your job posting.",
+                )
+
+        except Exception:
+            app.logger.warning(
+                "Optional new application email could not be sent.",
+                exc_info=True,
+            )
+
+        finally:
+            if email_cursor is not None:
+                email_cursor.close()
+            if email_conn is not None:
+                email_conn.close()
+
+        return jsonify(response_data), 201

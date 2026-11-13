@@ -167,18 +167,19 @@ def register_application_tracking_routes(app, get_connection, get_current_user):
     def update_application_status(application_id):
         """Allow only the recruiter who owns the job to change its status.
 
-        Authorization is enforced by the SQL UPDATE itself so an authenticated
-        but unrelated user cannot change another recruiter's application.
-        Requires jobs.recruiter_id to be an auth-user UUID; see schema notes.
+        Authorization is enforced by the SQL queries so an unrelated user
+        cannot change another recruiter's application.
         """
         user = get_current_user()
         if user is None:
             return jsonify({"error": "Authentication required."}), 401
         if not _is_uuid(application_id):
             return jsonify({"error": "Invalid application ID."}), 400
+
         payload = request.get_json(silent=True)
         if not isinstance(payload, dict):
             return jsonify({"error": "Request body must be a JSON object."}), 400
+
         status = payload.get("status")
         if not isinstance(status, str) or status not in APPLICATION_STATUSES:
             return jsonify({"error": "Invalid application status."}), 400
@@ -193,35 +194,87 @@ def register_application_tracking_routes(app, get_connection, get_current_user):
         try:
             conn = get_connection()
             cursor = conn.cursor()
+
+            # Check the previous status and lock the application row.
+            # Only the recruiter who owns the job can access it.
+            cursor.execute(
+                """
+                SELECT a.status
+                FROM applications AS a
+                JOIN jobs AS j ON a.job_id = j.id
+                WHERE a.id = %s
+                    AND j.recruiter_id = %s
+                FOR UPDATE OF a
+                """,
+                (application_id, recruiter_id),
+            )
+
+            previous_row = cursor.fetchone()
+
+            if previous_row is None:
+                conn.rollback()
+                return jsonify({"error": "Application not found."}), 404
+
+            previous_status = previous_row[0]
+
+            # Update the application status.
             cursor.execute(
                 """
                 UPDATE applications AS a
                 SET status = %s
                 FROM jobs AS j
                 WHERE a.id = %s
-                  AND a.job_id = j.id
-                  AND j.recruiter_id = %s
+                    AND a.job_id = j.id
+                    AND j.recruiter_id = %s
                 RETURNING a.id, a.applicant_id, a.job_id,
                           a.resume_id, a.status, a.created_at
                 """,
                 (status, application_id, recruiter_id),
             )
+
             row = cursor.fetchone()
+
             if row is None:
                 conn.rollback()
-                # Also hides whether the application exists but belongs to
-                # another recruiter: no cross-account existence disclosure.
+                # Do not reveal whether another recruiter's application exists.
                 return jsonify({"error": "Application not found."}), 404
+
+            # Create a notification only if the status actually changed.
+            if previous_status != status:
+                cursor.execute(
+                    """
+                    INSERT INTO notifications (
+                        user_id,
+                        application_id,
+                        type,
+                        title,
+                        message
+                    )
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (
+                        str(row[1]),
+                        str(row[0]),
+                        "application_status",
+                        "Application Status Updated",
+                        f"Your application status has changed to {status}.",
+                    ),
+                )
+
+            # Save the status update and notification together.
             conn.commit()
+
             return jsonify({
                 "message": "Application status updated successfully.",
                 "application": _application_dict(row),
             }), 200
+
         except Exception:
             if conn is not None:
                 conn.rollback()
             app.logger.exception("Application status update failed")
             return jsonify({"error": "Unable to update application status."}), 500
+
         finally:
             if cursor is not None:
                 cursor.close()

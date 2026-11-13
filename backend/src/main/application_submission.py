@@ -1,9 +1,3 @@
-"""Sprint 2 job-application submission.
-
-Keep the application endpoint separate from teammates' existing authentication,
-profile and resume handlers. Database table contracts are documented in the
-Sprint 2 implementation notes and must be confirmed with the database owner.
-"""
 
 import uuid
 
@@ -48,7 +42,11 @@ def _format_application(row):
         "job_id": row[2],
         "resume_id": str(row[3]) if row[3] is not None else None,
         "status": row[4],
-        "submitted_at": submitted_at.isoformat() if hasattr(submitted_at, "isoformat") else str(submitted_at),
+        "submitted_at": (
+            submitted_at.isoformat()
+            if hasattr(submitted_at, "isoformat")
+            else str(submitted_at)
+        ),
     }
 
 
@@ -92,36 +90,86 @@ def register_application_submission_routes(app, get_connection, get_current_user
             conn = get_connection()
             cursor = conn.cursor()
 
-            # The team's latest /api/jobs endpoint treats 'published' jobs
-            # as available and uses integer job IDs. Hatem must still
-            # confirm the deployed schema before integration testing.
+            # Check that the job is published.
+            # Also retrieve the recruiter who owns the job.
             cursor.execute(
-                "SELECT id FROM public.jobs WHERE id = %s AND status = %s",
+                """
+                SELECT id, recruiter_id
+                FROM public.jobs
+                WHERE id = %s AND status = %s
+                """,
                 (job_id, "published"),
             )
-            if cursor.fetchone() is None:
-                return jsonify({"error": "Job not found or not open for applications."}), 404
+
+            job_row = cursor.fetchone()
+
+            if job_row is None:
+                return jsonify({
+                    "error": "Job not found or not open for applications."
+                }), 404
+
+            recruiter_id = job_row[1]
 
             # The optional resume must belong to the authenticated user.
-            # Existing backend resume code uses resumes.profile_id as owner.
             if resume_id is not None:
                 cursor.execute(
-                    "SELECT id FROM resumes WHERE id = %s AND profile_id = %s",
+                    """
+                    SELECT id
+                    FROM resumes
+                    WHERE id = %s AND profile_id = %s
+                    """,
                     (resume_id, applicant_id),
                 )
                 if cursor.fetchone() is None:
-                    return jsonify({"error": "Resume not found for this account."}), 404
-
+                    return jsonify({
+                        "error": "Resume not found for this account."
+                    }), 404
+            # Insert the new job application.
             # The database must enforce UNIQUE(applicant_id, job_id).
             cursor.execute(
                 """
-                INSERT INTO applications (applicant_id, job_id, resume_id, cover_letter, status)
+                INSERT INTO applications (
+                    applicant_id,
+                    job_id,
+                    resume_id,
+                    cover_letter,
+                    status
+                )
                 VALUES (%s, %s, %s, %s, %s)
-                RETURNING id, applicant_id, job_id, resume_id, status, created_at
+                RETURNING id, applicant_id, job_id,
+                          resume_id, status, created_at
                 """,
-                (applicant_id, job_id, resume_id, cover_letter or None, "Applied"),
+                (
+                    applicant_id,
+                    job_id,
+                    resume_id,
+                    cover_letter or None,
+                    "Applied",
+                ),
             )
             row = cursor.fetchone()
+
+            # Notify the recruiter about the application.
+            cursor.execute(
+                """
+                INSERT INTO notifications (
+                    user_id,
+                    application_id,
+                    type,
+                    title,
+                    message
+                )
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (
+                    str(recruiter_id),
+                    str(row[0]),
+                    "new_application",
+                    "New Job Application",
+                    "A candidate has submitted an application for your job posting.",
+                ),
+            )
+            # Save the application and notification together.
             conn.commit()
 
             return jsonify({
@@ -132,9 +180,13 @@ def register_application_submission_routes(app, get_connection, get_current_user
             if conn is not None:
                 conn.rollback()
             if getattr(exc, "pgcode", None) == "23505":
-                return jsonify({"error": "You have already applied to this job."}), 409
+                return jsonify({
+                    "error": "You have already applied to this job."
+                }), 409
             app.logger.exception("Job application submission failed")
-            return jsonify({"error": "Unable to submit application at this time."}), 500
+            return jsonify({
+                "error": "Unable to submit application at this time."
+            }), 500
         finally:
             if cursor is not None:
                 cursor.close()

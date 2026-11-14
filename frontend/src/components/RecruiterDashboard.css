@@ -1,0 +1,211 @@
+.recruiter-dashboard {
+    color: var(--cc-text);
+}
+
+.recruiter-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.recruiter-heading h1 {
+    margin: 0.2rem 0 0.5rem;
+    font-size: clamp(1.7rem, 3vw, 2.2rem);
+}
+
+.recruiter-eyebrow {
+    margin: 0;
+    color: var(--cc-primary);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+
+.recruiter-intro,
+.recruiter-panel-heading p {
+    margin: 0;
+    color: var(--cc-muted);
+}
+
+.recruiter-count {
+    display: grid;
+    min-width: 9.5rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius);
+    background: var(--cc-surface);
+    text-align: center;
+}
+
+.recruiter-count strong {
+    color: var(--cc-primary);
+    font-size: 1.5rem;
+}
+
+.recruiter-count span {
+    color: var(--cc-muted);
+    font-size: 0.8rem;
+}
+
+.recruiter-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(15rem, 0.9fr);
+    align-items: start;
+    gap: 1.25rem;
+}
+
+.recruiter-panel,
+.recruiter-side-panel {
+    min-width: 0;
+    padding: clamp(1rem, 2.5vw, 1.6rem);
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius);
+    background: var(--cc-surface);
+    box-shadow: var(--cc-shadow);
+}
+
+.recruiter-panel-heading {
+    margin-bottom: 1.25rem;
+}
+
+.recruiter-panel-heading h2 {
+    margin: 0 0 0.35rem;
+    font-size: 1.2rem;
+}
+
+.recruiter-panel-heading p {
+    font-size: 0.9rem;
+}
+
+.recruiter-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.recruiter-field {
+    display: grid;
+    min-width: 0;
+    gap: 0.45rem;
+    color: var(--cc-text);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.recruiter-field-full {
+    grid-column: 1 / -1;
+}
+
+.recruiter-field input,
+.recruiter-field textarea {
+    width: 100%;
+    min-width: 0;
+    padding: 0.7rem 0.75rem;
+    border: 1px solid var(--cc-border-strong);
+    border-radius: var(--cc-radius-sm);
+    background: var(--cc-surface);
+    font-weight: 400;
+}
+
+.recruiter-field textarea {
+    resize: vertical;
+}
+
+.recruiter-field input:focus,
+.recruiter-field textarea:focus {
+    border-color: var(--cc-primary);
+    outline: 2px solid var(--cc-primary-soft);
+}
+
+.recruiter-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 1.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--cc-border);
+}
+
+.recruiter-form-actions button {
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--cc-primary);
+    border-radius: var(--cc-radius-sm);
+    background: var(--cc-primary);
+    color: white;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.recruiter-form-actions button:hover {
+    background: var(--cc-primary-hover);
+}
+
+.recruiter-form-actions button:disabled {
+    cursor: wait;
+    opacity: 0.65;
+}
+
+.recruiter-error {
+    margin: 1rem 0 0;
+    color: var(--cc-danger);
+}
+
+.recruiter-empty {
+    margin: 0;
+    padding: 1rem;
+    border: 1px dashed var(--cc-border-strong);
+    border-radius: var(--cc-radius-sm);
+    color: var(--cc-muted);
+    font-size: 0.9rem;
+}
+
+.recruiter-listings {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.recruiter-listing {
+    padding: 0.9rem;
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-sm);
+}
+
+.recruiter-listing h3 {
+    margin: 0 0 0.35rem;
+    font-size: 1rem;
+}
+
+.recruiter-listing p {
+    margin: 0.2rem 0;
+}
+
+.recruiter-listing-meta {
+    color: var(--cc-muted);
+    font-size: 0.85rem;
+}
+
+@media (max-width: 760px) {
+    .recruiter-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 520px) {
+    .recruiter-heading {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .recruiter-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .recruiter-field-full {
+        grid-column: auto;
+    }
+}

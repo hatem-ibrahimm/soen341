@@ -159,6 +159,7 @@ function seed() {
                 status_history: history(['Applied', 4], ['Under Review', 1]),
             },
         ],
+        jobs: MOCK_JOBS,
     }
 }
 

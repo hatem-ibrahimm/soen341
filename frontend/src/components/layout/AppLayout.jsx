@@ -20,6 +20,9 @@ export default function AppLayout() {
                         <NavLink to="/applications" className={navClass}>
                             My applications
                         </NavLink>
+                        <NavLink to="/recruiter" className={navClass}>
+                            Recruiter dashboard
+                        </NavLink>
                     </nav>
                     <ProfileMenu />
                 </div>

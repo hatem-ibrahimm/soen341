@@ -5,6 +5,7 @@ import AppLayout from './components/layout/AppLayout.jsx'
 import RequireAuth from './components/layout/RequireAuth.jsx'
 import LoginForm from './components/LoginForm.jsx'
 import RegistrationForm from './components/RegistrationForm.jsx'
+import RecruiterDashboard from './components/RecruiterDashboard.jsx'
 import ApplicationSubmittedPage from './features/applications/ApplicationSubmittedPage.jsx'
 import ApplyPage from './features/applications/ApplyPage.jsx'
 import MyApplicationsPage from './features/applications/MyApplicationsPage.jsx'
@@ -29,6 +30,7 @@ function App() {
                     <Route path="/jobs/:jobId/apply" element={<ApplyPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/applications" element={<MyApplicationsPage />} />
+                    <Route path="/recruiter" element={<RecruiterDashboard />} />
                     <Route path="/applications/:applicationId/submitted" element={<ApplicationSubmittedPage />} />
                 </Route>
             </Route>

@@ -31,12 +31,22 @@ function toApplication(raw, job = null, extra = {}) {
 }
 
 function withMockJob(app) {
-    return { ...app, job: MOCK_JOBS.find((j) => j.id === app.job_id) ?? null }
+    const jobs = readDb().jobs ?? MOCK_JOBS
+    return {
+        ...app,
+        job: jobs.find((job) => String(job.id) === String(app.job_id)) ?? null,
+    }
 }
 
 export async function submitApplication(payload) {
     if (USE_MOCK_API) {
         const db = readDb()
+        const job = (db.jobs ?? MOCK_JOBS).find(
+            (item) => String(item.id) === String(payload.job_id),
+        )
+        if (!job || (job.status && job.status !== 'published')) {
+            throw new Error('This job is no longer accepting applications.')
+        }
         if (db.applications.some((a) => a.job_id === payload.job_id)) {
             throw new Error('You have already applied to this job.')
         }
@@ -70,13 +80,24 @@ export async function listMyApplications() {
         apps.sort((a, b) => b.applied_at.localeCompare(a.applied_at))
         return delay(apps)
     }
-    // Load the applications and the job list together, then attach each job's details.
-    const [data, jobs] = await Promise.all([
-        request('/api/applications?limit=100'),
-        listJobs().catch(() => []),
-    ])
+
+    const rawApplications = []
+    let offset = 0
+    let hasMore = true
+    while (hasMore) {
+        const data = await request(
+            `/api/applications?limit=100&offset=${offset}`,
+        )
+        const page = data.applications ?? []
+        rawApplications.push(...page)
+        hasMore = Boolean(data.pagination?.has_more && page.length)
+        offset += page.length
+    }
+
+    // Load public postings once; a closed posting may no longer be available here.
+    const jobs = await listJobs().catch(() => [])
     const jobsById = new Map(jobs.map((j) => [j.id, j]))
-    return (data.applications ?? []).map((raw) =>
+    return rawApplications.map((raw) =>
         toApplication(raw, jobsById.get(String(raw.job_id)) ?? null),
     )
 }

@@ -14,7 +14,7 @@ import './LoginForm.css'
 function getReturnDestination(value) {
     if (
         typeof value === 'string' &&
-        /^\/jobs(?:\/[^?#\\]*)?(?:\?[^#\\]*)?$/.test(value)
+        /^\/jobs(?:\/[^?#\\]*)*(?:\?[^#\\]*)?$/.test(value)
     ) {
         return value
     }
@@ -78,7 +78,9 @@ function LoginForm() {
             }
 
             navigate(
-                getReturnDestination(location.state?.returnTo),
+                getReturnDestination(
+                    location.state?.returnTo ?? location.state?.from,
+                ),
                 { replace: true },
             )
         } catch (requestError) {

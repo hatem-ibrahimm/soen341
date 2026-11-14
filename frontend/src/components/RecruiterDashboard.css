@@ -30,6 +30,42 @@
     color: var(--cc-muted);
 }
 
+.recruiter-notice {
+    margin: 0 0 1rem;
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--cc-success-soft);
+    border-radius: var(--cc-radius-sm);
+    background: var(--cc-success-soft);
+    color: var(--cc-success);
+}
+
+.recruiter-error-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    padding: 0.8rem 1rem;
+    border: 1px solid var(--cc-danger-soft);
+    border-radius: var(--cc-radius-sm);
+    background: var(--cc-danger-soft);
+    color: var(--cc-danger);
+}
+
+.recruiter-error-box p {
+    margin: 0;
+}
+
+.recruiter-error-box button,
+.recruiter-text-button {
+    border: 0;
+    background: transparent;
+    color: var(--cc-primary);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+}
+
 .recruiter-count {
     display: grid;
     min-width: 9.5rem;
@@ -68,6 +104,10 @@
 }
 
 .recruiter-panel-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
     margin-bottom: 1.25rem;
 }
 
@@ -100,7 +140,8 @@
 }
 
 .recruiter-field input,
-.recruiter-field textarea {
+.recruiter-field textarea,
+.recruiter-field select {
     width: 100%;
     min-width: 0;
     padding: 0.7rem 0.75rem;
@@ -115,7 +156,8 @@
 }
 
 .recruiter-field input:focus,
-.recruiter-field textarea:focus {
+.recruiter-field textarea:focus,
+.recruiter-field select:focus {
     border-color: var(--cc-primary);
     outline: 2px solid var(--cc-primary-soft);
 }
@@ -128,7 +170,7 @@
     border-top: 1px solid var(--cc-border);
 }
 
-.recruiter-form-actions button {
+.recruiter-form-actions button[type="submit"] {
     padding: 0.7rem 1rem;
     border: 1px solid var(--cc-primary);
     border-radius: var(--cc-radius-sm);
@@ -138,11 +180,11 @@
     cursor: pointer;
 }
 
-.recruiter-form-actions button:hover {
+.recruiter-form-actions button[type="submit"]:hover {
     background: var(--cc-primary-hover);
 }
 
-.recruiter-form-actions button:disabled {
+.recruiter-form-actions button[type="submit"]:disabled {
     cursor: wait;
     opacity: 0.65;
 }
@@ -150,6 +192,105 @@
 .recruiter-error {
     margin: 1rem 0 0;
     color: var(--cc-danger);
+}
+
+.recruiter-skills {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.recruiter-skills legend {
+    margin-bottom: 0.45rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.recruiter-skills legend span {
+    color: var(--cc-muted);
+    font-weight: 400;
+}
+
+.recruiter-skill-entry {
+    display: flex;
+    gap: 0.6rem;
+}
+
+.recruiter-skill-entry input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.7rem 0.75rem;
+    border: 1px solid var(--cc-border-strong);
+    border-radius: var(--cc-radius-sm);
+    background: var(--cc-surface);
+}
+
+.recruiter-skill-entry input:focus {
+    border-color: var(--cc-primary);
+    outline: 2px solid var(--cc-primary-soft);
+}
+
+.recruiter-secondary-button,
+.recruiter-close-button {
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--cc-border-strong);
+    border-radius: var(--cc-radius-sm);
+    background: var(--cc-surface);
+    color: var(--cc-text);
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.recruiter-secondary-button:hover {
+    border-color: var(--cc-primary);
+    color: var(--cc-primary);
+}
+
+.recruiter-close-button {
+    border-color: var(--cc-danger);
+    color: var(--cc-danger);
+}
+
+.recruiter-close-button:hover {
+    background: var(--cc-danger-soft);
+}
+
+.recruiter-close-button:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.recruiter-skill-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.75rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.recruiter-skill-list li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.55rem 0.35rem 0.75rem;
+    border-radius: 999px;
+    background: var(--cc-primary-soft);
+    color: var(--cc-primary);
+    font-size: 0.85rem;
+}
+
+.recruiter-skill-list button {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
 }
 
 .recruiter-empty {
@@ -180,6 +321,32 @@
     font-size: 1rem;
 }
 
+.recruiter-listing-top {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.4rem;
+}
+
+.recruiter-status {
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    background: var(--cc-bg);
+    color: var(--cc-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: capitalize;
+}
+
+.recruiter-status-published {
+    background: var(--cc-success-soft);
+    color: var(--cc-success);
+}
+
+.recruiter-status-closed {
+    background: var(--cc-danger-soft);
+    color: var(--cc-danger);
+}
+
 .recruiter-listing p {
     margin: 0.2rem 0;
 }
@@ -187,6 +354,13 @@
 .recruiter-listing-meta {
     color: var(--cc-muted);
     font-size: 0.85rem;
+}
+
+.recruiter-listing-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.8rem;
 }
 
 @media (max-width: 760px) {
@@ -207,5 +381,10 @@
 
     .recruiter-field-full {
         grid-column: auto;
+    }
+
+    .recruiter-skill-entry {
+        align-items: stretch;
+        flex-direction: column;
     }
 }

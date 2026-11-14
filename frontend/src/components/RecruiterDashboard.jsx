@@ -1,5 +1,9 @@
-import { useState } from 'react'
-import { createJobListing } from '../services/recruiterApi.js'
+import { useEffect, useState } from 'react'
+import {
+    createJobListing,
+    listRecruiterJobs,
+    updateJobListing,
+} from '../services/recruiterApi.js'
 import './RecruiterDashboard.css'
 
 const EMPTY_FORM = {
@@ -7,78 +11,260 @@ const EMPTY_FORM = {
     company_name: '',
     location: '',
     category: '',
+    description: '',
+    required_skills: [],
     min_salary: '',
     max_salary: '',
-    description: '',
+    status: 'draft',
+}
+
+function formFromJob(job) {
+    return {
+        title: job.title ?? '',
+        company_name: job.company_name ?? job.company ?? '',
+        location: job.location ?? '',
+        category: job.category ?? '',
+        description: job.description ?? '',
+        required_skills: job.required_skills ?? [],
+        min_salary: job.min_salary ?? '',
+        max_salary: job.max_salary ?? '',
+        status: job.status ?? 'draft',
+    }
 }
 
 function RecruiterDashboard() {
+    const [jobs, setJobs] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [loadError, setLoadError] = useState('')
+    const [retryCount, setRetryCount] = useState(0)
+    const [editingJob, setEditingJob] = useState(null)
     const [form, setForm] = useState(EMPTY_FORM)
-    const [listings, setListings] = useState([])
-    const [error, setError] = useState('')
-    const [isSubmitting, setIsSubmitting] = useState(false)
+    const [skillDraft, setSkillDraft] = useState('')
+    const [formError, setFormError] = useState('')
+    const [notice, setNotice] = useState('')
+    const [isSaving, setIsSaving] = useState(false)
+    const [closingJobId, setClosingJobId] = useState(null)
+
+    useEffect(() => {
+        let active = true
+
+        listRecruiterJobs()
+            .then((listings) => {
+                if (active) setJobs(listings)
+            })
+            .catch((error) => {
+                if (active) {
+                    setLoadError(error.message || 'Unable to load your job postings.')
+                }
+            })
+            .finally(() => {
+                if (active) setLoading(false)
+            })
+
+        return () => {
+            active = false
+        }
+    }, [retryCount])
+
+    function retryLoad() {
+        setLoading(true)
+        setLoadError('')
+        setRetryCount((count) => count + 1)
+    }
 
     function handleChange(event) {
         const { name, value } = event.target
         setForm((current) => ({ ...current, [name]: value }))
-        setError('')
+        setFormError('')
+        setNotice('')
+    }
+
+    function addSkill(event) {
+        event?.preventDefault()
+        const skill = skillDraft.trim()
+
+        if (!skill) return
+        if (skill.length > 80) {
+            setFormError('Each required skill must be 80 characters or fewer.')
+            return
+        }
+        if (form.required_skills.length >= 30) {
+            setFormError('Add no more than 30 required skills.')
+            return
+        }
+        if (
+            form.required_skills.some(
+                (existing) => existing.toLocaleLowerCase() === skill.toLocaleLowerCase(),
+            )
+        ) {
+            setFormError('That required skill has already been added.')
+            return
+        }
+
+        setForm((current) => ({
+            ...current,
+            required_skills: [...current.required_skills, skill],
+        }))
+        setSkillDraft('')
+        setFormError('')
+    }
+
+    function removeSkill(skillToRemove) {
+        setForm((current) => ({
+            ...current,
+            required_skills: current.required_skills.filter(
+                (skill) => skill !== skillToRemove,
+            ),
+        }))
+    }
+
+    function validateForm() {
+        const requiredTextFields = [
+            ['title', 'Job title', 160],
+            ['company_name', 'Company name', 160],
+            ['location', 'Location', 200],
+            ['category', 'Category', 100],
+            ['description', 'Description', 10000],
+        ]
+
+        for (const [field, label, maxLength] of requiredTextFields) {
+            const value = form[field].trim()
+            if (!value) return `${label} is required.`
+            if (value.length > maxLength) {
+                return `${label} must be ${maxLength} characters or fewer.`
+            }
+        }
+
+        for (const [field, label] of [
+            ['min_salary', 'Minimum salary'],
+            ['max_salary', 'Maximum salary'],
+        ]) {
+            if (form[field] === '') continue
+            const amount = Number(form[field])
+            if (!Number.isFinite(amount) || amount < 0 || amount > 1_000_000_000) {
+                return `${label} must be between 0 and 1,000,000,000.`
+            }
+            if (!/^(?:\d+(?:\.\d{0,2})?|\.\d{1,2})$/.test(form[field])) {
+                return `${label} may contain at most two decimal places.`
+            }
+        }
+
+        if (
+            form.min_salary !== '' &&
+            form.max_salary !== '' &&
+            Number(form.min_salary) > Number(form.max_salary)
+        ) {
+            return 'Minimum salary cannot exceed maximum salary.'
+        }
+
+        if (form.required_skills.length > 30) {
+            return 'Add no more than 30 required skills.'
+        }
+
+        return ''
     }
 
     async function handleSubmit(event) {
         event.preventDefault()
-        if (isSubmitting) return
+        if (isSaving) return
+
+        const validationError = validateForm()
+        if (validationError) {
+            setFormError(validationError)
+            return
+        }
 
         const listing = {
+            ...form,
             title: form.title.trim(),
             company_name: form.company_name.trim(),
             location: form.location.trim(),
             category: form.category.trim(),
             description: form.description.trim(),
+            required_skills: form.required_skills,
             min_salary: form.min_salary === '' ? null : Number(form.min_salary),
             max_salary: form.max_salary === '' ? null : Number(form.max_salary),
         }
 
-        if (
-            !listing.title ||
-            !listing.company_name ||
-            !listing.location ||
-            !listing.category ||
-            !listing.description
-        ) {
-            setError('Complete all required fields before publishing.')
-            return
-        }
-
-        if (listing.min_salary != null && listing.min_salary < 0) {
-            setError('Minimum salary must be a non-negative amount.')
-            return
-        }
-        if (listing.max_salary != null && listing.max_salary < 0) {
-            setError('Maximum salary must be a non-negative amount.')
-            return
-        }
-        if (
-            listing.min_salary != null &&
-            listing.max_salary != null &&
-            listing.min_salary > listing.max_salary
-        ) {
-            setError('Maximum salary must be greater than or equal to minimum salary.')
-            return
-        }
-
-        setError('')
-        setIsSubmitting(true)
+        setFormError('')
+        setNotice('')
+        setIsSaving(true)
 
         try {
-            const created = await createJobListing(listing)
-            setListings((current) => [created, ...current])
+            const savedJob = editingJob
+                ? await updateJobListing(editingJob.id, listing)
+                : await createJobListing(listing)
+            setJobs((current) => {
+                const withoutSaved = current.filter(
+                    (job) => String(job.id) !== String(savedJob.id),
+                )
+                return [savedJob, ...withoutSaved]
+            })
+            setNotice(
+                editingJob
+                    ? 'Your job posting has been updated.'
+                    : listing.status === 'published'
+                        ? 'Your job posting is published and visible in job search.'
+                        : 'Your draft has been saved. Publish it when it is ready.',
+            )
+            setEditingJob(null)
             setForm(EMPTY_FORM)
-        } catch (requestError) {
-            setError(requestError.message || 'Unable to create the job listing.')
+            setSkillDraft('')
+        } catch (error) {
+            setFormError(error.message || 'Unable to save the job posting.')
         } finally {
-            setIsSubmitting(false)
+            setIsSaving(false)
         }
     }
+
+    function startCreate() {
+        setEditingJob(null)
+        setForm(EMPTY_FORM)
+        setSkillDraft('')
+        setFormError('')
+        setNotice('')
+    }
+
+    function startEdit(job) {
+        setEditingJob(job)
+        setForm(formFromJob(job))
+        setSkillDraft('')
+        setFormError('')
+        setNotice('')
+    }
+
+    async function closeListing(job) {
+        if (
+            !window.confirm(
+                `Close "${job.title}"? It will stop accepting applications. Existing applications will be kept.`,
+            )
+        ) {
+            return
+        }
+
+        setClosingJobId(job.id)
+        setLoadError('')
+        setNotice('')
+        try {
+            const updated = await updateJobListing(job.id, { status: 'closed' })
+            setJobs((current) =>
+                current.map((item) =>
+                    String(item.id) === String(updated.id) ? updated : item,
+                ),
+            )
+            if (String(editingJob?.id) === String(updated.id)) {
+                setEditingJob(updated)
+                setForm(formFromJob(updated))
+            }
+            setNotice('The job posting is closed. Existing applications remain unchanged.')
+        } catch (error) {
+            setLoadError(error.message || 'Unable to close the job posting.')
+        } finally {
+            setClosingJobId(null)
+        }
+    }
+
+    const isEditing = Boolean(editingJob)
 
     return (
         <div className="recruiter-dashboard">
@@ -87,25 +273,53 @@ function RecruiterDashboard() {
                     <p className="recruiter-eyebrow">Recruiter workspace</p>
                     <h1>Recruiter dashboard</h1>
                     <p className="recruiter-intro">
-                        Create a job listing and connect with qualified candidates.
+                        Create and manage your job postings.
                     </p>
                 </div>
-                <div className="recruiter-count" aria-label={`${listings.length} listings created this session`}>
-                    <strong>{listings.length}</strong>
-                    <span>Created this session</span>
+                <div className="recruiter-count">
+                    <strong>{jobs.length}</strong>
+                    <span>Your postings</span>
                 </div>
             </header>
 
+            {notice && <p className="recruiter-notice" role="status">{notice}</p>}
+            {loadError && (
+                <div className="recruiter-error-box">
+                    <p role="alert">{loadError}</p>
+                    <button
+                        type="button"
+                        onClick={retryLoad}
+                    >
+                        Retry
+                    </button>
+                </div>
+            )}
+
             <div className="recruiter-layout">
-                <section className="recruiter-panel" aria-labelledby="create-listing-heading">
+                <section className="recruiter-panel" aria-labelledby="posting-form-heading">
                     <div className="recruiter-panel-heading">
                         <div>
-                            <h2 id="create-listing-heading">Create a job listing</h2>
-                            <p>Share the role details candidates need to apply.</p>
+                            <h2 id="posting-form-heading">
+                                {isEditing ? 'Edit job posting' : 'Create a job posting'}
+                            </h2>
+                            <p>
+                                {isEditing
+                                    ? 'Update your role details and publication status.'
+                                    : 'Draft postings stay private. Published postings appear in job search.'}
+                            </p>
                         </div>
+                        {isEditing && (
+                            <button
+                                type="button"
+                                className="recruiter-text-button"
+                                onClick={startCreate}
+                            >
+                                Create new
+                            </button>
+                        )}
                     </div>
 
-                    <form className="recruiter-form" onSubmit={handleSubmit}>
+                    <form className="recruiter-form" onSubmit={handleSubmit} noValidate>
                         <div className="recruiter-form-grid">
                             <label className="recruiter-field recruiter-field-full">
                                 Job title
@@ -113,8 +327,7 @@ function RecruiterDashboard() {
                                     name="title"
                                     value={form.title}
                                     onChange={handleChange}
-                                    placeholder="e.g. Frontend Developer"
-                                    maxLength={120}
+                                    maxLength={160}
                                     required
                                 />
                             </label>
@@ -125,8 +338,7 @@ function RecruiterDashboard() {
                                     name="company_name"
                                     value={form.company_name}
                                     onChange={handleChange}
-                                    placeholder="Company name"
-                                    maxLength={120}
+                                    maxLength={160}
                                     required
                                 />
                             </label>
@@ -137,23 +349,91 @@ function RecruiterDashboard() {
                                     name="location"
                                     value={form.location}
                                     onChange={handleChange}
-                                    placeholder="City, province or remote"
-                                    maxLength={120}
+                                    maxLength={200}
                                     required
                                 />
                             </label>
 
-                            <label className="recruiter-field recruiter-field-full">
+                            <label className="recruiter-field">
                                 Category
                                 <input
                                     name="category"
                                     value={form.category}
                                     onChange={handleChange}
-                                    placeholder="e.g. Software, Design, Data"
-                                    maxLength={80}
+                                    maxLength={100}
                                     required
                                 />
                             </label>
+
+                            <label className="recruiter-field">
+                                Publication status
+                                <select
+                                    name="status"
+                                    value={form.status}
+                                    onChange={handleChange}
+                                    disabled={form.status === 'closed'}
+                                >
+                                    <option value="draft">Draft — private</option>
+                                    <option value="published">Published — visible in search</option>
+                                    {form.status === 'closed' && (
+                                        <option value="closed">Closed</option>
+                                    )}
+                                </select>
+                            </label>
+
+                            <label className="recruiter-field recruiter-field-full">
+                                Job description
+                                <textarea
+                                    name="description"
+                                    value={form.description}
+                                    onChange={handleChange}
+                                    rows="5"
+                                    maxLength={10000}
+                                    required
+                                />
+                            </label>
+
+                            <fieldset className="recruiter-field recruiter-field-full recruiter-skills">
+                                <legend>Required skills <span>(optional, up to 30)</span></legend>
+                                <div className="recruiter-skill-entry">
+                                    <input
+                                        aria-label="Add a required skill"
+                                        value={skillDraft}
+                                        onChange={(event) => {
+                                            setSkillDraft(event.target.value)
+                                            setFormError('')
+                                        }}
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Enter') addSkill(event)
+                                        }}
+                                        maxLength={80}
+                                        placeholder="e.g. React or Python"
+                                    />
+                                    <button
+                                        type="button"
+                                        className="recruiter-secondary-button"
+                                        onClick={addSkill}
+                                    >
+                                        Add skill
+                                    </button>
+                                </div>
+                                {form.required_skills.length > 0 && (
+                                    <ul className="recruiter-skill-list">
+                                        {form.required_skills.map((skill) => (
+                                            <li key={skill}>
+                                                {skill}
+                                                <button
+                                                    type="button"
+                                                    aria-label={`Remove ${skill}`}
+                                                    onClick={() => removeSkill(skill)}
+                                                >
+                                                    ×
+                                                </button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </fieldset>
 
                             <label className="recruiter-field">
                                 Minimum salary (CAD/year)
@@ -161,8 +441,9 @@ function RecruiterDashboard() {
                                     name="min_salary"
                                     type="number"
                                     min="0"
-                                    step="1"
-                                    inputMode="numeric"
+                                    max="1000000000"
+                                    step="0.01"
+                                    inputMode="decimal"
                                     value={form.min_salary}
                                     onChange={handleChange}
                                     placeholder="Optional"
@@ -175,63 +456,102 @@ function RecruiterDashboard() {
                                     name="max_salary"
                                     type="number"
                                     min="0"
-                                    step="1"
-                                    inputMode="numeric"
+                                    max="1000000000"
+                                    step="0.01"
+                                    inputMode="decimal"
                                     value={form.max_salary}
                                     onChange={handleChange}
                                     placeholder="Optional"
                                 />
                             </label>
-
-                            <label className="recruiter-field recruiter-field-full">
-                                Job description
-                                <textarea
-                                    name="description"
-                                    value={form.description}
-                                    onChange={handleChange}
-                                    placeholder="Describe the role, responsibilities, and qualifications."
-                                    rows="6"
-                                    maxLength={5000}
-                                    required
-                                />
-                            </label>
                         </div>
 
-                        {error && <p className="recruiter-error" role="alert">{error}</p>}
+                        {formError && <p className="recruiter-error" role="alert">{formError}</p>}
 
                         <div className="recruiter-form-actions">
-                            <button type="submit" disabled={isSubmitting}>
-                                {isSubmitting ? 'Publishing…' : 'Publish job listing'}
+                            {isEditing && (
+                                <button
+                                    type="button"
+                                    className="recruiter-secondary-button"
+                                    onClick={startCreate}
+                                >
+                                    Cancel
+                                </button>
+                            )}
+                            <button type="submit" disabled={isSaving}>
+                                {isSaving
+                                    ? 'Saving…'
+                                    : isEditing
+                                        ? 'Save changes'
+                                        : form.status === 'published'
+                                            ? 'Publish job posting'
+                                            : 'Save draft'}
                             </button>
                         </div>
                     </form>
                 </section>
 
-                <aside className="recruiter-side-panel" aria-labelledby="recent-listings-heading">
+                <aside className="recruiter-side-panel" aria-labelledby="your-postings-heading">
                     <div className="recruiter-panel-heading">
                         <div>
-                            <h2 id="recent-listings-heading">Recently created</h2>
-                            <p>Listings you have published in this session.</p>
+                            <h2 id="your-postings-heading">Your job postings</h2>
+                            <p>Only postings managed by your recruiter account.</p>
                         </div>
                     </div>
-                    {listings.length ? (
+
+                    {loading ? (
+                        <p className="recruiter-empty" role="status">Loading your postings…</p>
+                    ) : jobs.length ? (
                         <ul className="recruiter-listings">
-                            {listings.map((job) => (
-                                <li key={job.id} className="recruiter-listing">
-                                    <h3>{job.title}</h3>
-                                    <p>{job.company}</p>
-                                    <p className="recruiter-listing-meta">
-                                        {job.location} · {job.category}
-                                    </p>
-                                    {job.salary && (
-                                        <p className="recruiter-listing-meta">{job.salary}</p>
-                                    )}
-                                </li>
-                            ))}
+                            {jobs.map((job) => {
+                                const status = job.status ?? 'published'
+                                const isClosing = String(closingJobId) === String(job.id)
+                                return (
+                                    <li key={job.id} className="recruiter-listing">
+                                        <div className="recruiter-listing-top">
+                                            <span className={`recruiter-status recruiter-status-${status}`}>
+                                                {status}
+                                            </span>
+                                        </div>
+                                        <h3>{job.title}</h3>
+                                        <p>{job.company_name ?? job.company}</p>
+                                        <p className="recruiter-listing-meta">
+                                            {job.location} · {job.category}
+                                        </p>
+                                        {job.salary && (
+                                            <p className="recruiter-listing-meta">{job.salary}</p>
+                                        )}
+                                        {job.required_skills?.length > 0 && (
+                                            <p className="recruiter-listing-meta">
+                                                Skills: {job.required_skills.join(', ')}
+                                            </p>
+                                        )}
+                                        <div className="recruiter-listing-actions">
+                                            <button
+                                                type="button"
+                                                className="recruiter-secondary-button"
+                                                onClick={() => startEdit(job)}
+                                            >
+                                                Edit
+                                            </button>
+                                            {status !== 'closed' && (
+                                                <button
+                                                    type="button"
+                                                    className="recruiter-close-button"
+                                                    disabled={isClosing}
+                                                    onClick={() => closeListing(job)}
+                                                >
+                                                    {isClosing ? 'Closing…' : 'Close posting'}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </li>
+                                )
+                            })}
                         </ul>
-                    ) : (
+                    ) : loadError ? null : (
                         <p className="recruiter-empty" role="status">
-                            Your published listings will appear here.
+                            You have no job postings yet. Create a draft or publish an opening.
                         </p>
                     )}
                 </aside>

@@ -23,6 +23,7 @@ export function toJob(raw) {
     return {
         id: String(raw.id),
         title: raw.title,
+        company_name: raw.company_name,
         company: raw.company_name,
         location: raw.location,
         type: raw.category,
@@ -30,13 +31,21 @@ export function toJob(raw) {
         salary: formatSalary(raw.min_salary, raw.max_salary),
         min_salary: raw.min_salary,
         max_salary: raw.max_salary,
+        required_skills: raw.required_skills ?? [],
+        status: raw.status,
         posted_at: raw.created_at,
         description: raw.description,
     }
 }
 
 export async function listJobs() {
-    if (USE_MOCK_API) return delay(readDb().jobs ?? MOCK_JOBS)
+    if (USE_MOCK_API) {
+        return delay(
+            (readDb().jobs ?? MOCK_JOBS).filter(
+                (job) => !job.status || job.status === 'published',
+            ),
+        )
+    }
     const data = await request('/api/jobs')
     return (data.jobs ?? []).map(toJob)
 }
@@ -44,7 +53,9 @@ export async function listJobs() {
 export async function getJob(jobId) {
     if (USE_MOCK_API) {
         const job = (readDb().jobs ?? MOCK_JOBS).find((j) => j.id === jobId)
-        if (!job) throw new Error('This job posting could not be found.')
+        if (!job || (job.status && job.status !== 'published')) {
+            throw new Error('This job posting could not be found or is no longer open.')
+        }
         return delay(job)
     }
     const data = await request(`/api/jobs/${jobId}`)

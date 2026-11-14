@@ -1,8 +1,3 @@
-"""Unit tests for the isolated Sprint 2 application-submission endpoint.
-
-These tests use mocks and do NOT demonstrate integration with Hatem's actual
-PostgreSQL schema; that integration must be verified separately.
-"""
 
 import unittest
 from datetime import datetime, timezone
@@ -13,12 +8,14 @@ from src.main.app import create_app
 
 
 USER_ID = "550e8400-e29b-41d4-a716-446655440000"
+RECRUITER_ID = "5d901892-0103-49a2-9d77-5e31f9b3d3c1"
 JOB_ID = 42
 RESUME_ID = "8cb0abe6-2c39-45dc-a700-3cf2bd28592c"
 APPLICATION_ID = "e4be1505-c45b-4f1c-9068-8dbd91a86dd5"
 
 
 class SubmitApplicationTests(unittest.TestCase):
+
     def setUp(self):
         self.connection = MagicMock()
         self.cursor = MagicMock()
@@ -35,8 +32,12 @@ class SubmitApplicationTests(unittest.TestCase):
         self.client = self.app.test_client()
         self.headers = {"Authorization": "Bearer fake-test-token"}
         self.application_row = (
-            APPLICATION_ID, USER_ID, JOB_ID, None,
-            "Applied", datetime(2026, 10, 25, 20, 0, tzinfo=timezone.utc)
+            APPLICATION_ID,
+            USER_ID,
+            JOB_ID,
+            None,
+            "Applied",
+            datetime(2026, 10, 25, 20, 0, tzinfo=timezone.utc),
         )
 
     def _rows(self, *rows):
@@ -56,28 +57,43 @@ class SubmitApplicationTests(unittest.TestCase):
 
     def test_rejects_non_json_body(self):
         response = self.client.post(
-            "/api/applications", data="hello", headers=self.headers,
-            content_type="text/plain"
+            "/api/applications",
+            data="hello",
+            headers=self.headers,
+            content_type="text/plain",
         )
         self.assertEqual(response.status_code, 400)
         self.connection.cursor.assert_not_called()
 
     def test_rejects_missing_or_invalid_job_id(self):
-        for payload in ({}, {"job_id": "not-a-number"}, {"job_id": -1}, {"job_id": False}, {"job_id": 2.5}):
+        for payload in (
+            {},
+            {"job_id": "not-a-number"},
+            {"job_id": -1},
+            {"job_id": False},
+            {"job_id": 2.5},
+        ):
             with self.subTest(payload=payload):
                 response = self._submit(payload)
                 self.assertEqual(response.status_code, 400)
         self.connection.cursor.assert_not_called()
 
     def test_rejects_invalid_resume_id(self):
-        response = self._submit({"job_id": JOB_ID, "resume_id": "abc"})
+        response = self._submit({
+            "job_id": JOB_ID,
+            "resume_id": "abc",
+        })
+
         self.assertEqual(response.status_code, 400)
         self.connection.cursor.assert_not_called()
 
     def test_rejects_nontext_or_overlong_cover_letter(self):
         for cover_letter in (22, "x" * 2001):
             with self.subTest(value=type(cover_letter).__name__):
-                response = self._submit({"job_id": JOB_ID, "cover_letter": cover_letter})
+                response = self._submit({
+                    "job_id": JOB_ID,
+                    "cover_letter": cover_letter,
+                })
                 self.assertEqual(response.status_code, 400)
         self.connection.cursor.assert_not_called()
 
@@ -85,50 +101,126 @@ class SubmitApplicationTests(unittest.TestCase):
         self._rows(None)
         response = self._submit()
         self.assertEqual(response.status_code, 404)
-        self.cursor.execute.assert_called_once_with(
-            "SELECT id FROM public.jobs WHERE id = %s AND status = %s",
-            (JOB_ID, "published"),
-        )
+
+        sql, params = self.cursor.execute.call_args.args
+
+        self.assertIn("SELECT id, recruiter_id", sql)
+        self.assertIn("FROM public.jobs", sql)
+        self.assertEqual(params, (JOB_ID, "published"))
+
         self.connection.commit.assert_not_called()
         self.connection.close.assert_called_once()
 
     def test_success_uses_authenticated_user_not_body_applicant_id(self):
-        self._rows((JOB_ID,), self.application_row)
-        response = self._submit({"job_id": JOB_ID, "applicant_id": "fake-user-id", "cover_letter": " Hello! "})
+        self._rows(
+            (JOB_ID, RECRUITER_ID),
+            self.application_row,
+            ("recruiter@example.com",),
+        )
+
+        response = self._submit({
+            "job_id": JOB_ID,
+            "applicant_id": "fake-user-id",
+            "cover_letter": " Hello! ",
+        })
+
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.get_json()["application"]["status"], "Applied")
-        self.assertEqual(response.get_json()["application"]["applicant_id"], USER_ID)
-        self.assertEqual(response.get_json()["application"]["submitted_at"], "2026-10-25T20:00:00+00:00")
-        self.assertEqual(self.cursor.execute.call_count, 2)
-        sql, params = self.cursor.execute.call_args.args
-        self.assertIn("INSERT INTO applications", sql)
-        self.assertEqual(params, (USER_ID, JOB_ID, None, "Hello!", "Applied"))
+        self.assertEqual(
+            response.get_json()["application"]["status"], "Applied"
+        )
+        self.assertEqual(
+            response.get_json()["application"]["applicant_id"], USER_ID
+        )
+        self.assertEqual(
+            response.get_json()["application"]["submitted_at"],
+            "2026-10-25T20:00:00+00:00",
+        )
+
+        # Job lookup, application insert, notification insert.
+        self.assertEqual(self.cursor.execute.call_count, 4)
+
+        application_sql, application_params = (
+            self.cursor.execute.call_args_list[1].args
+        )
+
+        self.assertIn("INSERT INTO applications", application_sql)
+        self.assertEqual(
+            application_params,
+            (USER_ID, JOB_ID, None, "Hello!", "Applied"),
+        )
+
         self.connection.commit.assert_called_once()
-        self.cursor.close.assert_called_once()
-        self.connection.close.assert_called_once()
+        self.assertEqual(self.cursor.close.call_count, 2)
+        self.assertEqual(self.connection.close.call_count, 2)
 
     def test_accepts_numeric_string_job_id_and_normalizes_it(self):
-        self._rows((JOB_ID,), self.application_row)
+        self._rows(
+            (JOB_ID, RECRUITER_ID),
+            self.application_row,
+        )
+
         response = self._submit({"job_id": str(JOB_ID)})
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.get_json()["application"]["job_id"], JOB_ID)
-        sql, params = self.cursor.execute.call_args.args
-        self.assertEqual(params[1], JOB_ID)
+        self.assertEqual(
+            response.get_json()["application"]["job_id"], JOB_ID
+        )
+
+        application_sql, application_params = (
+            self.cursor.execute.call_args_list[1].args
+        )
+
+        self.assertIn("INSERT INTO applications", application_sql)
+        self.assertEqual(application_params[1], JOB_ID)
 
     def test_success_with_owned_resume(self):
-        row = (APPLICATION_ID, USER_ID, JOB_ID, RESUME_ID, "Applied", datetime.now(timezone.utc))
-        self._rows((JOB_ID,), (RESUME_ID,), row)
-        response = self._submit({"job_id": JOB_ID, "resume_id": RESUME_ID})
+        row = (
+            APPLICATION_ID,
+            USER_ID,
+            JOB_ID,
+            RESUME_ID,
+            "Applied",
+            datetime.now(timezone.utc),
+        )
+
+        self._rows(
+            (JOB_ID, RECRUITER_ID),
+            (RESUME_ID,),
+            row,
+            ("recruiter@example.com",),
+        )
+
+        response = self._submit({
+            "job_id": JOB_ID,
+            "resume_id": RESUME_ID,
+        })
+
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(self.cursor.execute.call_count, 3)
-        second_sql, second_params = self.cursor.execute.call_args_list[1].args
-        self.assertIn("FROM resumes", second_sql)
-        self.assertEqual(second_params, (RESUME_ID, USER_ID))
-        self.assertEqual(response.get_json()["application"]["resume_id"], RESUME_ID)
+
+        # Job lookup, resume lookup, application insert, notification insert.
+        self.assertEqual(self.cursor.execute.call_count, 5)
+
+        resume_sql, resume_params = (
+            self.cursor.execute.call_args_list[1].args
+        )
+
+        self.assertIn("FROM resumes", resume_sql)
+        self.assertEqual(resume_params, (RESUME_ID, USER_ID))
+
+        self.assertEqual(
+            response.get_json()["application"]["resume_id"], RESUME_ID
+        )
 
     def test_cannot_submit_another_users_resume(self):
-        self._rows((JOB_ID,), None)
-        response = self._submit({"job_id": JOB_ID, "resume_id": RESUME_ID})
+        self._rows(
+            (JOB_ID, RECRUITER_ID),
+            None,
+        )
+
+        response = self._submit({
+            "job_id": JOB_ID,
+            "resume_id": RESUME_ID,
+        })
+
         self.assertEqual(response.status_code, 404)
         self.connection.commit.assert_not_called()
         self.assertEqual(self.cursor.execute.call_count, 2)
@@ -136,22 +228,94 @@ class SubmitApplicationTests(unittest.TestCase):
     def test_duplicate_submission_returns_conflict(self):
         err = Exception("duplicate")
         err.pgcode = "23505"
-        self._rows((JOB_ID,))
+
+        self._rows((JOB_ID, RECRUITER_ID))
         self.cursor.execute.side_effect = [None, err]
+
         response = self._submit()
+
         self.assertEqual(response.status_code, 409)
         self.connection.rollback.assert_called_once()
         self.connection.close.assert_called_once()
 
     def test_db_failure_returns_safe_error_and_rolls_back(self):
-        self._rows((JOB_ID,))
-        self.cursor.execute.side_effect = [None, RuntimeError("DB secret internal failure")]
+        self._rows((JOB_ID, RECRUITER_ID))
+
+        self.cursor.execute.side_effect = [
+            None,
+            RuntimeError("DB secret internal failure"),
+        ]
+
         response = self._submit()
+
         self.assertEqual(response.status_code, 500)
         self.assertNotIn("DB secret", response.get_json()["error"])
         self.connection.rollback.assert_called_once()
         self.connection.close.assert_called_once()
 
+    # -------------------------------------------------------
+    # Tests for automatic recruiter notifications
+    def test_new_application_creates_recruiter_notification(self):
+        self._rows(
+            (JOB_ID, RECRUITER_ID),
+            self.application_row,
+        )
+        response = self._submit()
+        self.assertEqual(response.status_code, 201)
+        notification_sql, notification_params = (
+            self.cursor.execute.call_args_list[2].args
+        )
+        self.assertIn("INSERT INTO notifications", notification_sql)
+        self.assertEqual(
+            notification_params,
+            (
+                RECRUITER_ID,
+                APPLICATION_ID,
+                "new_application",
+                "New Job Application",
+                "A candidate has submitted an application for your job posting.",
+            ),
+        )
+        self.connection.commit.assert_called_once()
+
+    def test_notification_failure_rolls_back_application(self):
+        self._rows(
+            (JOB_ID, RECRUITER_ID),
+            self.application_row,
+        )
+
+        # Simulate a failure during notification insertion.
+        def execute_query(sql, params):
+            if "INSERT INTO notifications" in sql:
+                raise RuntimeError("Notification insert failed")
+
+        self.cursor.execute.side_effect = execute_query
+
+        response = self._submit()
+
+        self.assertEqual(response.status_code, 500)
+        self.connection.rollback.assert_called_once()
+        self.connection.commit.assert_not_called()
+        self.connection.close.assert_called_once()
+
+    def test_invalid_application_does_not_notify_recruiter(self):
+        # The requested job does not exist or is unpublished.
+        self._rows(None)
+
+        response = self._submit()
+
+        self.assertEqual(response.status_code, 404)
+
+        queries = [
+            call.args[0]
+            for call in self.cursor.execute.call_args_list
+        ]
+
+        self.assertFalse(
+            any("INSERT INTO notifications" in sql for sql in queries)
+        )
+
+        self.connection.commit.assert_not_called()
 
 if __name__ == "__main__":
     unittest.main()

@@ -1377,6 +1377,15 @@ def create_app(test_config=None):
         app, get_connection, get_current_user
     )
 
+    if __package__:
+        from .ai_resume_feedback import register_ai_resume_feedback_routes
+    else:
+        from ai_resume_feedback import register_ai_resume_feedback_routes
+
+    register_ai_resume_feedback_routes(
+        app, get_connection, get_current_user, get_resume_storage
+    )
+
     return app
 
 

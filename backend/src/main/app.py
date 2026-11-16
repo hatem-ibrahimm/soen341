@@ -1397,6 +1397,16 @@ def create_app(test_config=None):
         app, get_connection, get_current_user
     )
 
+    # Sprint 3 Issue #80: application history and activity metrics.
+    if __package__:
+        from .application_history import register_application_history_routes
+    else:
+        from application_history import register_application_history_routes
+
+    register_application_history_routes(
+        app, get_connection, get_current_user
+    )
+
     return app
 
 

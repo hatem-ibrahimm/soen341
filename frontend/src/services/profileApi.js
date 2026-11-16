@@ -9,11 +9,10 @@ import { delay, fileToDataUrl, newId, readDb, writeDb } from './mockStore.js'
 //   POST    /api/profiles/<id>/picture         multipart "picture" (JPG/PNG, max 2 MB)
 // Not in the backend yet: experiences, education, skills, background image.
 
-// Turn these on when the backend adds the matching routes.
-export const SECTIONS_SUPPORTED = USE_MOCK_API // experience, education, skills
+export const SECTIONS_SUPPORTED = true
 export const COVER_SUPPORTED = USE_MOCK_API // background image
 
-const base = () => `/api/profiles/${getUserId()}`
+const base = () => `/api/profiles/${encodeURIComponent(getUserId())}`
 
 async function getPictureUrl() {
     try {
@@ -29,12 +28,16 @@ export async function getFullProfile() {
         const { profile, experiences, education, skills } = readDb()
         return delay({ profile, experiences, education, skills })
     }
-    const [data, avatar_url] = await Promise.all([request(base()), getPictureUrl()])
+    const [data, avatar_url, sections] = await Promise.all([
+        request(base()),
+        getPictureUrl(),
+        request(`${base()}/sections`),
+    ])
     return {
         profile: { ...data.profile, avatar_url, cover_url: '' },
-        experiences: data.experiences ?? [],
-        education: data.education ?? [],
-        skills: data.skills ?? [],
+        experiences: sections.experiences ?? [],
+        education: sections.education ?? [],
+        skills: sections.skills ?? [],
     }
 }
 
@@ -58,7 +61,10 @@ function replaceList(key, items, prefix) {
         writeDb(db)
         return delay(db[key])
     }
-    return Promise.reject(new Error('Saving this section is not available yet.'))
+    return request(`${base()}/sections/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        body: { items },
+    }).then((data) => data[key])
 }
 
 export const updateExperiences = (items) => replaceList('experiences', items, 'exp')

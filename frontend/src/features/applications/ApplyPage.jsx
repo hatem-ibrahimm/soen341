@@ -124,7 +124,13 @@ export default function ApplyPage() {
                                     {resumes.resumes.map((r) => (
                                         <label key={r.id} className={`${styles.resumeChoice} ${resumeId === r.id ? styles.selected : ''}`}>
                                             <input type="radio" name="resume" value={r.id} checked={resumeId === r.id} onChange={() => setResumeId(r.id)} />
-                                            <span className={styles.fileBadge}>{/\.pdf$/i.test(r.file_name) ? 'PDF' : 'DOC'}</span>
+                                            <span className={styles.fileBadge}>
+                                                {r.file_name.toLowerCase().endsWith('.pdf')
+                                                    ? 'PDF'
+                                                    : r.file_name.toLowerCase().endsWith('.docx')
+                                                        ? 'DOCX'
+                                                        : 'DOC'}
+                                            </span>
                                             <span className={styles.resumeText}>
                                                 <strong>{r.file_name}</strong>
                                                 <small>
@@ -142,7 +148,7 @@ export default function ApplyPage() {
                                     onSelect={handleUpload}
                                     disabled={resumes.busyId === 'new'}
                                     label={resumes.busyId === 'new' ? 'Uploading…' : 'Upload a different resume'}
-                                    hint="PDF or DOC · 5 MB max · also saved to your profile"
+                                    hint="PDF, DOC, or DOCX · 10 MB max · also saved to your profile"
                                 />
                             )}
                         </Card>

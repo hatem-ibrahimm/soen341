@@ -376,3 +376,20 @@ SELECT r ->> 'feature' AS feature,
        r ->> 'checks'  AS checks,
        r ->> 'result'  AS result
 FROM jsonb_array_elements(current_setting('at.sprint3_results')::jsonb) AS r;
+
+DO $assert$
+DECLARE failures text;
+BEGIN
+  SELECT string_agg(
+    format('%s: %s (%s)', r ->> 'test', r ->> 'result', r ->> 'checks'),
+    '; '
+  )
+  INTO failures
+  FROM jsonb_array_elements(current_setting('at.sprint3_results')::jsonb) AS r
+  WHERE r ->> 'result' IS DISTINCT FROM 'PASS';
+
+  IF failures IS NOT NULL THEN
+    RAISE EXCEPTION 'Sprint 3 acceptance tests failed: %', failures;
+  END IF;
+END
+$assert$;

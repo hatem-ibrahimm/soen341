@@ -73,6 +73,29 @@ class ResumeApiTests(unittest.TestCase):
         self.storage.upload.assert_called_once()
         self.connection.commit.assert_called_once()
 
+    def test_upload_docx_resume_succeeds(self):
+        docx_row = (
+            "resume-123",
+            self.profile_id,
+            "resume.docx",
+            f"{self.profile_id}/resume123.docx",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            8,
+            "2026-10-25T10:00:00+00:00",
+        )
+        self.cursor.fetchone.side_effect = [None, docx_row]
+
+        response = self.client.post(
+            self.url,
+            headers=self.headers,
+            data={"resume": (BytesIO(b"DOCX data"), "resume.docx")},
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.get_json()["resume"]["file_name"], "resume.docx")
+        self.storage.upload.assert_called_once()
+
     def test_invalid_resume_format_is_rejected(self):
         response = self.client.post(
             self.url,
@@ -87,7 +110,7 @@ class ResumeApiTests(unittest.TestCase):
         )
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("Only PDF and DOC", response.get_json()["error"])
+        self.assertIn("Only PDF, DOC, and DOCX", response.get_json()["error"])
         self.cursor.execute.assert_not_called()
         self.storage.upload.assert_not_called()
 
@@ -134,6 +157,11 @@ class ResumeApiTests(unittest.TestCase):
             response.get_json()["message"],
             "Resume replaced successfully.",
         )
+        self.assertTrue(any(
+            "DELETE FROM public.resume_feedback" in call.args[0]
+            and call.args[1] == (self.resume_row[0],)
+            for call in self.cursor.execute.call_args_list
+        ))
         self.storage.upload.assert_called_once()
         self.storage.remove.assert_called_once()
         self.connection.commit.assert_called_once()

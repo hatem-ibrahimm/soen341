@@ -41,18 +41,34 @@ export default function ApplicationCard({ app, resumeName, highlighted }) {
                                 </li>
                             ))}
                         </ul>
+                        {app.interviews?.length > 0 && (
+                            <>
+                                <h4>Interviews</h4>
+                                <ul className={styles.timeline}>
+                                    {app.interviews.map((interview) => (
+                                        <li key={interview.id}>
+                                            <strong>{interview.status}</strong>
+                                            <span>{new Date(interview.scheduled_at).toLocaleString()}</span>
+                                            {interview.location && <span>{interview.location}</span>}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </>
+                        )}
                     </div>
                     <div>
                         <h4>What you sent</h4>
                         <dl className={styles.confirmFacts}>
                             <dt>Resume</dt>
                             <dd>{resumeName ?? 'Resume'}</dd>
-                              {app.cover_letter && (
+                            {app.contact_email && <><dt>Email</dt><dd>{app.contact_email}</dd></>}
+                            {app.contact_phone && <><dt>Phone</dt><dd>{app.contact_phone}</dd></>}
+                            {app.cover_letter && (
                                 <>
                                     <dt>Cover letter</dt>
                                     <dd><span className={styles.coverText}>{app.cover_letter}</span></dd>
                                 </>
-                                )}
+                            )}
                             <dt>Confirmation #</dt>
                             <dd><code>{confirmationNumber(app.id)}</code></dd>
                         </dl>

@@ -1,0 +1,45 @@
+name: Task
+description: A piece of work needed to deliver a user story.
+title: "S4 - T00 - "
+labels: ["type: task"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What needs to be built or changed.
+    validations:
+      required: true
+  - type: input
+    id: story
+    attributes:
+      label: Part of
+      description: The user story this task belongs to.
+      placeholder: "#81"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Tasks
+      description: The steps, as a checklist.
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: How we know this task is finished.
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Branch name, files, or anything a teammate needs to know.
+  - type: markdown
+    attributes:
+      value: "After creating: add one area label (frontend, backend, database or testing), set the milestone, and assign it."

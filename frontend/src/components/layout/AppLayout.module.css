@@ -10,8 +10,18 @@
 .brand { display: flex; align-items: center; gap: 10px; color: var(--cc-text); text-decoration: none; font-weight: 750; font-size: 1.05rem; }
 .nav { display: flex; gap: 4px; margin-left: auto; }
 .navLink {
-  display: flex; align-items: center; padding: 7px 14px; border-radius: var(--cc-radius-sm);
+  display: flex; align-items: center; gap: 7px; padding: 7px 14px; border-radius: var(--cc-radius-sm);
   color: var(--cc-muted); text-decoration: none; font-weight: 600; font-size: 0.93rem;
+}
+.notificationCount {
+  min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--cc-accent); color: #fff; font-size: 0.7rem; line-height: 1;
+}
+.notificationError {
+  width: 18px; height: 18px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--cc-danger); color: #fff; font-size: 0.75rem; line-height: 1;
 }
 .navLink:hover { color: var(--cc-text); background: var(--cc-bg); }
 .active, .active:hover { color: var(--cc-primary); background: var(--cc-primary-soft); }

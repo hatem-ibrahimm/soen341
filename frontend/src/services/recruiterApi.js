@@ -159,7 +159,8 @@ export async function listRecruiterApplications(jobId) {
 
 export async function getRecruiterApplication(applicationId) {
     if (USE_MOCK_API) {
-        const application = readDb().applications.find(
+        const db = readDb()
+        const application = db.applications.find(
             (item) => String(item.id) === String(applicationId),
         )
         if (!application) throw new Error('Application not found.')
@@ -167,7 +168,20 @@ export async function getRecruiterApplication(applicationId) {
             (item) => String(item.id) === String(applicationId),
         )
         if (!listed) throw new Error('Application not found.')
-        return delay({ ...listed, cover_letter: application.cover_letter ?? '' })
+        return delay({
+            ...listed,
+            applicant: {
+                ...listed.applicant,
+                title: db.profile?.title ?? '',
+                phone_number: db.profile?.phone_number ?? '',
+                location: db.profile?.location ?? '',
+                bio: db.profile?.bio ?? '',
+            },
+            cover_letter: application.cover_letter ?? '',
+            experiences: db.experiences ?? [],
+            education: db.education ?? [],
+            skills: db.skills ?? [],
+        })
     }
     const data = await request(
         `/api/recruiter/applications/${encodeURIComponent(applicationId)}`,

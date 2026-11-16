@@ -75,6 +75,12 @@ def _serialize_application(row, *, details=False):
     }
     if details:
         data["cover_letter"] = row[10]
+        data["applicant"].update({
+            "title": row[11],
+            "phone_number": row[12],
+            "location": row[13],
+            "bio": row[14],
+        })
     return data
 
 
@@ -177,7 +183,8 @@ def register_recruiter_applicant_routes(
                 """
                 SELECT a.id, a.applicant_id, a.job_id, a.resume_id,
                        a.status, a.created_at, p.first_name, p.last_name,
-                       p.email, r.file_name, a.cover_letter
+                       p.email, r.file_name, a.cover_letter, p.title,
+                       p.phone_number, p.location, p.bio
                 FROM public.applications AS a
                 JOIN public.jobs AS j ON j.id = a.job_id
                 LEFT JOIN public.profiles AS p ON p.id = a.applicant_id

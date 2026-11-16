@@ -84,6 +84,21 @@ def create_app(test_config=None):
             app.config["SUPABASE_KEY"],
         )
 
+    def get_supabase_admin():
+        factory = app.config.get("SUPABASE_ADMIN_CLIENT_FACTORY")
+        if factory:
+            return factory()
+        factory = app.config.get("SUPABASE_CLIENT_FACTORY")
+        if factory:
+            return factory()
+
+        service_key = app.config.get("SUPABASE_SERVICE_KEY")
+        if not app.config["SUPABASE_URL"] or not service_key:
+            raise RuntimeError(
+                "SUPABASE_URL and SUPABASE_SERVICE_KEY must be configured."
+            )
+        return create_client(app.config["SUPABASE_URL"], service_key)
+
     def get_storage_supabase():
         factory = app.config.get("SUPABASE_CLIENT_FACTORY")
 
@@ -185,6 +200,20 @@ def create_app(test_config=None):
         password = str(payload.get("password", ""))
         first_name = str(payload.get("first_name", "")).strip()
         last_name = str(payload.get("last_name", "")).strip()
+        role = payload.get("role", "job_seeker")
+        company_name = payload.get("company_name", "")
+
+        if role not in ("job_seeker", "recruiter"):
+            return jsonify({"error": "role must be job_seeker or recruiter."}), 400
+        if not isinstance(company_name, str):
+            return jsonify({"error": "company_name must be text."}), 400
+        company_name = company_name.strip()
+        if role == "recruiter" and (
+            not company_name or len(company_name) > 160
+        ):
+            return jsonify({
+                "error": "Recruiter accounts require a company name of 160 characters or fewer."
+            }), 400
 
         # The registration form may send one "name" field instead,
         # e.g. "Ace Newton" -> first_name "Ace", last_name "Newton"
@@ -211,21 +240,34 @@ def create_app(test_config=None):
                 }
             ), 400
 
+        admin_supabase = None
+        if role == "recruiter":
+            try:
+                admin_supabase = get_supabase_admin()
+            except Exception:
+                app.logger.exception("Recruiter registration is not configured.")
+                return jsonify({
+                    "error": "Recruiter registration is currently unavailable."
+                }), 503
+
         try:
             supabase = get_supabase()
 
-            # "data" is saved as user metadata. The database trigger
-            # (handle_new_user) copies first_name and last_name from it
-            # into the new row in the profiles table.
+            user_metadata = {
+                "first_name": first_name,
+                "last_name": last_name,
+            }
+            if role == "recruiter":
+                user_metadata["company_name"] = company_name
+
+            # "data" is saved as user metadata. Only a trusted server-side
+            # admin client may grant the recruiter app_metadata role below.
             response = supabase.auth.sign_up(
                 {
                     "email": email,
                     "password": password,
                     "options": {
-                        "data": {
-                            "first_name": first_name,
-                            "last_name": last_name,
-                        }
+                        "data": user_metadata,
                     },
                 }
             )
@@ -236,6 +278,24 @@ def create_app(test_config=None):
             if user is None:
                 return jsonify({"error": "Unable to create account."}), 400
 
+            if role == "recruiter":
+                try:
+                    admin_supabase.auth.admin.update_user_by_id(
+                        str(user.id),
+                        {"app_metadata": {"role": "recruiter"}},
+                    )
+                except Exception:
+                    app.logger.exception("Recruiter role provisioning failed.")
+                    try:
+                        admin_supabase.auth.admin.delete_user(str(user.id))
+                    except Exception:
+                        app.logger.exception(
+                            "Failed to clean up an unprovisioned recruiter account."
+                        )
+                    return jsonify({
+                        "error": "Unable to activate recruiter access. Please try again."
+                    }), 503
+
             body = {
                 "message": (
                     "Account created successfully."
@@ -245,6 +305,8 @@ def create_app(test_config=None):
                 "user": {
                     "id": str(user.id),
                     "email": user.email,
+                    "role": role,
+                    "company_name": company_name if role == "recruiter" else "",
                 },
                 "email_confirmation_required": session is None,
             }
@@ -306,12 +368,27 @@ def create_app(test_config=None):
             if user is None or session is None:
                 return jsonify({"error": "Invalid email or password."}), 401
 
+            app_metadata = getattr(user, "app_metadata", None)
+            app_metadata = app_metadata if isinstance(app_metadata, dict) else {}
+            roles = app_metadata.get("roles", [])
+            role = "recruiter" if (
+                app_metadata.get("role") == "recruiter"
+                or isinstance(roles, (list, tuple)) and "recruiter" in roles
+            ) else "job_seeker"
+            user_metadata = getattr(user, "user_metadata", None)
+            user_metadata = user_metadata if isinstance(user_metadata, dict) else {}
+
             return jsonify(
                 {
                     "message": "Login successful.",
                     "user": {
                         "id": str(user.id),
                         "email": user.email,
+                        "role": role,
+                        "company_name": (
+                            user_metadata.get("company_name", "")
+                            if role == "recruiter" else ""
+                        ),
                     },
                     "session": {
                         "access_token": session.access_token,

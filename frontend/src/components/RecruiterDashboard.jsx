@@ -5,6 +5,7 @@ import {
     updateJobListing,
 } from '../services/recruiterApi.js'
 import RecruiterApplicants from './RecruiterApplicants.jsx'
+import { getCompanyName } from '../services/session.js'
 import './RecruiterDashboard.css'
 
 const EMPTY_FORM = {
@@ -17,6 +18,10 @@ const EMPTY_FORM = {
     min_salary: '',
     max_salary: '',
     status: 'draft',
+}
+
+function emptyForm() {
+    return { ...EMPTY_FORM, company_name: getCompanyName() }
 }
 
 function formFromJob(job) {
@@ -39,7 +44,7 @@ function RecruiterDashboard() {
     const [loadError, setLoadError] = useState('')
     const [retryCount, setRetryCount] = useState(0)
     const [editingJob, setEditingJob] = useState(null)
-    const [form, setForm] = useState(EMPTY_FORM)
+    const [form, setForm] = useState(emptyForm)
     const [skillDraft, setSkillDraft] = useState('')
     const [formError, setFormError] = useState('')
     const [notice, setNotice] = useState('')
@@ -209,7 +214,7 @@ function RecruiterDashboard() {
                         : 'Your draft has been saved. Publish it when it is ready.',
             )
             setEditingJob(null)
-            setForm(EMPTY_FORM)
+            setForm(emptyForm())
             setSkillDraft('')
         } catch (error) {
             setFormError(error.message || 'Unable to save the job posting.')
@@ -220,7 +225,7 @@ function RecruiterDashboard() {
 
     function startCreate() {
         setEditingJob(null)
-        setForm(EMPTY_FORM)
+        setForm(emptyForm())
         setSkillDraft('')
         setFormError('')
         setNotice('')

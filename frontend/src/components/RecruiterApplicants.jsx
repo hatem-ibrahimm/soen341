@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { APPLICATION_STATUSES } from '../constants/applicationStatus.js'
 import { formatDate } from '../services/format.js'
 import {
@@ -21,6 +22,22 @@ export default function RecruiterApplicants({ job }) {
     const [resumeLoadingId, setResumeLoadingId] = useState(null)
     const [resumeLinks, setResumeLinks] = useState({})
     const [updatingId, setUpdatingId] = useState(null)
+    const [statusFilter, setStatusFilter] = useState('All')
+    const [dateSort, setDateSort] = useState('newest')
+
+    const visibleApplications = useMemo(() => {
+        if (!applications) return []
+        return applications
+            .filter((application) =>
+                statusFilter === 'All' || application.status === statusFilter,
+            )
+            .sort((a, b) => {
+                const difference =
+                    new Date(a.submitted_at).getTime() -
+                    new Date(b.submitted_at).getTime()
+                return dateSort === 'newest' ? -difference : difference
+            })
+    }, [applications, dateSort, statusFilter])
 
     async function loadApplications() {
         setLoading(true)
@@ -119,8 +136,33 @@ export default function RecruiterApplicants({ job }) {
                             <button type="button" onClick={loadApplications}>Retry</button>
                         </div>
                     ) : applications?.length ? (
-                        <ul className="recruiter-applicant-list">
-                            {applications.map((application) => {
+                        <>
+                            <div className="recruiter-applicant-filters">
+                                <label>
+                                    Status
+                                    <select
+                                        value={statusFilter}
+                                        onChange={(event) => setStatusFilter(event.target.value)}
+                                    >
+                                        <option value="All">All statuses</option>
+                                        {APPLICATION_STATUSES.map((status) => (
+                                            <option key={status} value={status}>{status}</option>
+                                        ))}
+                                    </select>
+                                </label>
+                                <label>
+                                    Sort by date
+                                    <select
+                                        value={dateSort}
+                                        onChange={(event) => setDateSort(event.target.value)}
+                                    >
+                                        <option value="newest">Newest first</option>
+                                        <option value="oldest">Oldest first</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <ul className="recruiter-applicant-list">
+                            {visibleApplications.map((application) => {
                                 const applicant = application.applicant ?? {}
                                 const name = [applicant.first_name, applicant.last_name]
                                     .filter(Boolean)
@@ -137,14 +179,22 @@ export default function RecruiterApplicants({ job }) {
                                                 )}
                                                 <small>Applied {formatDate(application.submitted_at)}</small>
                                             </div>
-                                            <button
-                                                type="button"
-                                                className="recruiter-text-button"
-                                                aria-expanded={selectedId === application.id}
-                                                onClick={() => toggleDetails(application.id)}
-                                            >
-                                                {selectedId === application.id ? 'Hide review' : 'Review'}
-                                            </button>
+                                            <div className="recruiter-applicant-actions">
+                                                <Link
+                                                    className="recruiter-secondary-button"
+                                                    to={`/recruiter/applications/${encodeURIComponent(application.id)}/profile`}
+                                                >
+                                                    View full profile
+                                                </Link>
+                                                <button
+                                                    type="button"
+                                                    className="recruiter-text-button"
+                                                    aria-expanded={selectedId === application.id}
+                                                    onClick={() => toggleDetails(application.id)}
+                                                >
+                                                    {selectedId === application.id ? 'Hide review' : 'Review'}
+                                                </button>
+                                            </div>
                                         </div>
                                         <label className="recruiter-applicant-status">
                                             Application status
@@ -165,7 +215,16 @@ export default function RecruiterApplicants({ job }) {
                                                 ) : details ? (
                                                     <>
                                                         <h4>Candidate profile</h4>
+                                                        <p>
+                                                            {[details.applicant?.first_name, details.applicant?.last_name]
+                                                                .filter(Boolean)
+                                                                .join(' ') || 'Candidate'}
+                                                        </p>
                                                         <p>{details.applicant?.email || 'No email provided'}</p>
+                                                        {details.applicant?.title && <p>{details.applicant.title}</p>}
+                                                        {details.applicant?.phone_number && <p>{details.applicant.phone_number}</p>}
+                                                        {details.applicant?.location && <p>{details.applicant.location}</p>}
+                                                        {details.applicant?.bio && <p>{details.applicant.bio}</p>}
                                                         <h4>Cover letter</h4>
                                                         <p className="recruiter-cover-letter">
                                                             {details.cover_letter || 'No cover letter submitted.'}
@@ -198,7 +257,11 @@ export default function RecruiterApplicants({ job }) {
                                     </li>
                                 )
                             })}
-                        </ul>
+                            </ul>
+                            {visibleApplications.length === 0 && (
+                                <p className="recruiter-empty">No applicants match this status.</p>
+                            )}
+                        </>
                     ) : (
                         <p className="recruiter-empty">No applications have been submitted for this posting.</p>
                     )}

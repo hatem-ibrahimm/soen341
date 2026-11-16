@@ -24,7 +24,13 @@ def application_row(*, status="Applied", resume=True, profile=True, details=Fals
         "alex@example.test" if profile else None,
         "resume.pdf" if resume else None,
     )
-    return row + ("Please consider my application.",) if details else row
+    return row + (
+        "Please consider my application.",
+        "Software Engineer",
+        "514-555-0100",
+        "Montreal",
+        "Experienced software engineer.",
+    ) if details else row
 
 
 class RecruiterApplicantsTests(unittest.TestCase):
@@ -208,6 +214,8 @@ class RecruiterApplicantsTests(unittest.TestCase):
         application = response.get_json()["application"]
         self.assertEqual(application["cover_letter"], "Please consider my application.")
         self.assertEqual(application["submitted_at"], SUBMITTED_AT.isoformat())
+        self.assertEqual(application["applicant"]["title"], "Software Engineer")
+        self.assertEqual(application["applicant"]["location"], "Montreal")
         sql, args = self.cursor.execute.call_args.args
         self.assertIn("j.recruiter_id = %s", sql)
         self.assertIn("a.id = %s", sql)

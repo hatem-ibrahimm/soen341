@@ -890,6 +890,7 @@ def create_app(test_config=None):
     ALLOWED_RESUME_TYPES = {
         ".pdf": "application/pdf",
         ".doc": "application/msword",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     }
 
     def resume_to_dict(row):
@@ -951,7 +952,7 @@ def create_app(test_config=None):
 
         if extension not in ALLOWED_RESUME_TYPES:
             return None, (
-                jsonify({"error": "Only PDF and DOC files are allowed."}),
+                jsonify({"error": "Only PDF, DOC, and DOCX files are allowed."}),
                 400,
             )
 
@@ -1032,7 +1033,7 @@ def create_app(test_config=None):
 
             storage.upload(
                 new_storage_path,
-          upload["file_bytes"],
+                upload["file_bytes"],
                 file_options={
                     "content-type": upload["content_type"],
                     "upsert": "false",
@@ -1041,6 +1042,10 @@ def create_app(test_config=None):
 
             if existing_row:
                 old_resume = resume_to_dict(existing_row)
+                cursor.execute(
+                    "DELETE FROM public.resume_feedback WHERE resume_id = %s",
+                    (old_resume["id"],),
+                )
 
                 cursor.execute(
                     """
@@ -1087,12 +1092,12 @@ def create_app(test_config=None):
             saved_row = cursor.fetchone()
             connection.commit()
 
-           
+
             if old_resume:
                 try:
                     storage.remove([old_resume["storage_path"]])
                 except Exception:
-                    
+
                     pass
 
             return jsonify({
@@ -1108,7 +1113,7 @@ def create_app(test_config=None):
             if connection is not None:
                 connection.rollback()
 
-            
+
             if new_storage_path:
                 try:
                     get_resume_storage().remove([new_storage_path])
@@ -1305,10 +1310,14 @@ def create_app(test_config=None):
             # Retrieve published jobs.
             query = """
                 SELECT id, title, company_name, location,
-                       category, description, min_salary,
-                       max_salary, created_at, application_deadline
+                       category, description, required_skills, min_salary,
+                       max_salary, status, application_deadline, created_at
                 FROM public.jobs
                 WHERE status = 'published'
+                    AND (
+                        application_deadline IS NULL
+                        OR application_deadline >= CURRENT_DATE
+                    )
             """
             params = []
 
@@ -1321,10 +1330,11 @@ def create_app(test_config=None):
                         OR description ILIKE %s
                         OR location ILIKE %s
                         OR category ILIKE %s
+                        OR array_to_string(required_skills, ' ') ILIKE %s
                     )
                 """
                 search_term = f"%{keyword}%"
-                params.extend([search_term] * 5)
+                params.extend([search_term] * 6)
 
             # Optional location filter.
             if location:
@@ -1405,8 +1415,8 @@ def create_app(test_config=None):
             cursor.execute(
                 """
                 SELECT id, title, company_name, location,
-                       category, description, min_salary,
-                       max_salary, created_at, application_deadline
+                       category, description, required_skills, min_salary,
+                       max_salary, status, application_deadline, created_at
                 FROM public.jobs
                 WHERE id = %s AND status = 'published'
                 """,
@@ -1453,7 +1463,7 @@ def create_app(test_config=None):
             if connection is not None:
                 connection.close()
 
-  
+
     if __package__:
         from .application_submission import register_application_submission_routes
     else:
@@ -1503,6 +1513,13 @@ def create_app(test_config=None):
         app, get_connection, get_current_user, get_resume_download_url
     )
 
+    if __package__:
+        from .interviews import register_interview_routes
+    else:
+        from interviews import register_interview_routes
+
+    register_interview_routes(app, get_connection, get_current_user)
+
     # Sprint 3 Issue #79: job seeker application analytics.
     if __package__:
         from .application_analytics import register_application_analytics_routes
@@ -1521,6 +1538,22 @@ def create_app(test_config=None):
 
     register_application_history_routes(
         app, get_connection, get_current_user
+    )
+
+    if __package__:
+        from .profile_sections import register_profile_section_routes
+    else:
+        from profile_sections import register_profile_section_routes
+
+    register_profile_section_routes(app, get_connection, check_profile_access)
+
+    if __package__:
+        from .ai_resume_feedback import register_ai_resume_feedback_routes
+    else:
+        from ai_resume_feedback import register_ai_resume_feedback_routes
+
+    register_ai_resume_feedback_routes(
+        app, get_connection, get_current_user, get_resume_storage
     )
 
     return app

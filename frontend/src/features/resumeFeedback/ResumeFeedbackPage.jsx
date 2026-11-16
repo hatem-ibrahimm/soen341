@@ -4,6 +4,7 @@ import { Alert } from '../../components/common'
 import useResumes from '../../hooks/useResumes.js'
 import { formatDate, formatFileSize } from '../../services/format.js'
 import {
+    getSavedResumeFeedback,
     loadSavedFeedback,
     NO_RESUME,
     requestResumeFeedback,
@@ -80,6 +81,8 @@ function InfoButton() {
 export default function ResumeFeedbackPage() {
     const { resumes, loading: resumesLoading } = useResumes()
     const resume = resumes.find((r) => r.is_default) ?? resumes[0] ?? null
+    const resumeId = resume?.id
+    const resumeFileName = resume?.file_name
 
     const [saved, setSaved] = useState(() => loadSavedFeedback())
     const [running, setRunning] = useState(false)
@@ -93,8 +96,35 @@ export default function ResumeFeedbackPage() {
         return () => clearInterval(timer)
     }, [running])
 
+    useEffect(() => {
+        if (!resumeId || !resumeFileName) return undefined
+        let active = true
+        getSavedResumeFeedback()
+            .then((feedback) => {
+                if (!active || !feedback) return
+                const local = loadSavedFeedback()
+                const entry = {
+                    ...feedback,
+                    fileName: resumeFileName,
+                    done: local?.resumeId === feedback.resumeId ? local.done ?? [] : [],
+                }
+                saveFeedback(entry)
+                setSaved(entry)
+            })
+            .catch((requestError) => {
+                if (active) setError(requestError)
+            })
+        return () => {
+            active = false
+        }
+    }, [resumeFileName, resumeId])
+
     // Only show saved notes if they belong to the resume that is on the profile now.
-    const current = saved && resume && saved.fileName === resume.file_name ? saved : null
+    const current = saved && resume &&
+        String(saved.resumeId) === String(resume.id) &&
+        saved.fileName === resume.file_name
+        ? saved
+        : null
     const outdated = saved && resume && !current
 
     async function runReview() {

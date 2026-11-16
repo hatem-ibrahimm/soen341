@@ -40,3 +40,44 @@ jobs:
 
       - name: Run backend tests
         run: python -m pytest tests/ -v
+
+  supabase-acceptance-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Supabase CLI
+        id: setup-supabase-cli
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Reset database and apply migrations
+        run: supabase db reset --local --yes
+
+      - name: Run Sprint 2 acceptance tests
+        run: >-
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          -X -v ON_ERROR_STOP=1
+          -f supabase/tests/sprint2_acceptance.sql
+
+      - name: Run Sprint 3 acceptance tests
+        run: >-
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+          -X -v ON_ERROR_STOP=1
+          -f supabase/tests/sprint3_acceptance.sql
+
+      - name: Stop local Supabase
+        if: always() && steps.setup-supabase-cli.outcome == 'success'
+        run: supabase stop --no-backup

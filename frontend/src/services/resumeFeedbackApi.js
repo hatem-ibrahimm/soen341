@@ -5,8 +5,10 @@ import { delay } from './mockStore.js'
 // AI-Powered Resume Feedback (Sprint 3 start, finished in Sprint 4).
 //
 // Backend route (Ariana's branch feature/Sprint3/Ariana/ai-resume-feedback):
+//   GET  /api/profiles/<userId>/resume/feedback
+//     200 -> { feedback: null | { resume_id, strengths, areas_for_improvement, recommendations, generated_at } }
 //   POST /api/profiles/<userId>/resume/feedback      (no body)
-//     200 -> { resume_id, strengths: [...], areas_for_improvement: [...], recommendations: [...] }
+//     200 -> { resume_id, strengths, areas_for_improvement, recommendations, generated_at }
 //     400 -> { error: "Only PDF and DOCX resumes are supported." | "No readable text found in the resume." }
 //     401 / 403 -> not logged in / not your profile
 //     404 -> { error: "Resume not found." }
@@ -30,7 +32,7 @@ function toFeedback(raw) {
         strengths: asList(raw.strengths),
         improvements: asList(raw.areas_for_improvement),
         recommendations: asList(raw.recommendations),
-        reviewedAt: new Date().toISOString(),
+        reviewedAt: raw.generated_at ?? new Date().toISOString(),
     }
 }
 
@@ -76,6 +78,12 @@ export async function requestResumeFeedback() {
         }
         throw e
     }
+}
+
+export async function getSavedResumeFeedback() {
+    if (USE_MOCK_API) return null
+    const data = await request(`/api/profiles/${getUserId()}/resume/feedback`)
+    return data.feedback ? toFeedback(data.feedback) : null
 }
 
 // The last review is kept in this browser so the notes are still there

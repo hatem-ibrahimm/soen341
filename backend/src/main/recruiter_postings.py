@@ -1,11 +1,14 @@
 
 import uuid
+import re
+from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from flask import jsonify, request
 
 
-JOB_STATUSES = frozenset(("draft", "published", "closed"))
+JOB_STATUSES = frozenset(("draft", "published", "closed", "archived"))
+DEADLINE_PATTERN = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 REQUIRED_TEXT_FIELDS = {
     "title": 160,
     "company_name": 160,
@@ -15,13 +18,13 @@ REQUIRED_TEXT_FIELDS = {
 }
 EDITABLE_FIELDS = frozenset({
     *REQUIRED_TEXT_FIELDS,
-    "required_skills", "min_salary", "max_salary", "status",
+    "required_skills", "min_salary", "max_salary", "status", "application_deadline",
 })
 MAX_SALARY = Decimal("1000000000")
 JOB_COLUMNS = (
     "id", "recruiter_id", "title", "company_name", "location", "category",
     "description", "required_skills", "min_salary", "max_salary",
-    "status", "created_at",
+    "status", "created_at", "application_deadline",
 )
 JOB_RETURNING = ", ".join(JOB_COLUMNS)
 MAX_PAGE_SIZE = 100
@@ -143,14 +146,28 @@ def _validate_fields(payload, *, partial=False):
 
     if "status" in payload:
         if not isinstance(payload["status"], str) or payload["status"] not in JOB_STATUSES:
-            return None, "status must be draft, published, or closed."
+            return None, "status must be draft, published, closed, or archived."
         cleaned["status"] = payload["status"]
+
+    if "application_deadline" in payload:
+        raw_deadline = payload["application_deadline"]
+        if raw_deadline is None:
+            # PATCH with null clears a previously configured deadline.
+            cleaned["application_deadline"] = None
+        elif not isinstance(raw_deadline, str) or not DEADLINE_PATTERN.fullmatch(raw_deadline):
+            return None, "application_deadline must be a YYYY-MM-DD date or null."
+        else:
+            try:
+                cleaned["application_deadline"] = date.fromisoformat(raw_deadline)
+            except ValueError:
+                return None, "application_deadline must be a valid calendar date."
 
     if not partial:
         cleaned.setdefault("required_skills", [])
         cleaned.setdefault("min_salary", None)
         cleaned.setdefault("max_salary", None)
         cleaned.setdefault("status", "draft")
+        cleaned.setdefault("application_deadline", None)
         minimum, maximum = cleaned["min_salary"], cleaned["max_salary"]
         if minimum is not None and maximum is not None and minimum > maximum:
             return None, "min_salary cannot exceed max_salary."
@@ -165,6 +182,11 @@ def _job_dict(row):
         result[field] = float(result[field]) if result[field] is not None else None
     value = result["created_at"]
     result["created_at"] = value.isoformat() if hasattr(value, "isoformat") else str(value)
+    deadline = result["application_deadline"]
+    result["application_deadline"] = (
+        deadline.isoformat() if hasattr(deadline, "isoformat")
+        else (str(deadline) if deadline is not None else None)
+    )
     return result
 
 
@@ -212,14 +234,15 @@ def register_recruiter_posting_routes(app, get_connection, get_current_user):
             cursor.execute(
                 """INSERT INTO public.jobs (
                     recruiter_id, title, company_name, location, category,
-                    description, required_skills, min_salary, max_salary, status
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    description, required_skills, min_salary, max_salary,
+                    application_deadline, status
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING """ + JOB_RETURNING,
                 (
                     recruiter, data["title"], data["company_name"],
                     data["location"], data["category"], data["description"],
                     data["required_skills"], data["min_salary"],
-                    data["max_salary"], data["status"],
+                    data["max_salary"], data["application_deadline"], data["status"],
                 ),
             )
             row = cursor.fetchone()

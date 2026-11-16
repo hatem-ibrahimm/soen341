@@ -188,7 +188,7 @@ class AuthApiTests(unittest.TestCase):
             response.get_json()["session"]["access_token"],
             "access-token",
         )
-        self.assertEqual(response.get_json()["user"]["role"], "job_seeker")
+        self.assertEqual(response.get_json()["user"]["role"], "recruiter")
 
     def test_login_invalid_credentials(self):
         self.supabase.auth.sign_in_with_password.side_effect = Exception(

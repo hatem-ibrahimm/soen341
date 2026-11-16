@@ -1,5 +1,6 @@
 
 import pytest
+from datetime import date
 
 import sys
 from pathlib import Path
@@ -18,6 +19,7 @@ JOB_COLUMNS = [
     "min_salary",
     "max_salary",
     "created_at",
+    "application_deadline",
 ]
 
 JOB_ROW = (
@@ -30,6 +32,7 @@ JOB_ROW = (
     50000,
     70000,
     None,
+    date(2026, 12, 15),
 )
 
 
@@ -116,6 +119,8 @@ def test_list_jobs_returns_published_jobs(make_client):
     assert response.json["jobs"][0]["min_salary"] == 50000.0
     assert response.json["jobs"][0]["max_salary"] == 70000.0
     assert "status = 'published'" in cursor.query
+    assert "application_deadline" in cursor.query
+    assert response.json["jobs"][0]["application_deadline"] == "2026-12-15"
 
 
 def test_keyword_search_uses_all_main_fields(make_client):
@@ -189,6 +194,7 @@ def test_job_details_returns_job(make_client):
     assert response.json["job"]["id"] == 1
     assert response.json["job"]["min_salary"] == 50000.0
     assert response.json["job"]["max_salary"] == 70000.0
+    assert response.json["job"]["application_deadline"] == "2026-12-15"
 
 
 def test_missing_job_returns_404(make_client):
@@ -213,3 +219,30 @@ def test_connection_error_returns_500(make_client):
     response = client.get("/api/jobs")
 
     assert response.status_code == 500
+
+
+def test_null_deadline_is_returned_as_null(make_client):
+    row = JOB_ROW[:-1] + (None,)
+    client, _ = make_client(rows=[row], one_row=row)
+    listed = client.get("/api/jobs")
+    detail = client.get("/api/jobs/1")
+    assert listed.status_code == 200
+    assert detail.status_code == 200
+    assert listed.json["jobs"][0]["application_deadline"] is None
+    assert detail.json["job"]["application_deadline"] is None
+
+
+def test_public_job_search_does_not_include_archived_jobs(make_client):
+    client, cursor = make_client(rows=[])
+    response = client.get("/api/jobs")
+    assert response.status_code == 200
+    assert response.json["jobs"] == []
+    assert "WHERE status = 'published'" in cursor.query
+    # Any archived record is excluded by this SQL predicate, not by UI filtering.
+
+
+def test_public_job_details_restricts_to_published(make_client):
+    client, cursor = make_client(one_row=None)
+    response = client.get("/api/jobs/42")
+    assert response.status_code == 404
+    assert "status = 'published'" in cursor.query

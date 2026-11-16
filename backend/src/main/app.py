@@ -1306,7 +1306,7 @@ def create_app(test_config=None):
             query = """
                 SELECT id, title, company_name, location,
                        category, description, min_salary,
-                       max_salary, created_at
+                       max_salary, created_at, application_deadline
                 FROM public.jobs
                 WHERE status = 'published'
             """
@@ -1362,12 +1362,21 @@ def create_app(test_config=None):
                 for row in cursor.fetchall()
             ]
 
-            # Convert salary values to JSON-friendly numbers.
+            # Convert salary and deadline values to JSON-friendly formats.
             for job in jobs:
                 if job["min_salary"] is not None:
                     job["min_salary"] = float(job["min_salary"])
+
                 if job["max_salary"] is not None:
                     job["max_salary"] = float(job["max_salary"])
+
+                deadline = job["application_deadline"]
+                if deadline is not None:
+                    job["application_deadline"] = (
+                        deadline.isoformat()
+                        if hasattr(deadline, "isoformat")
+                        else str(deadline)
+                    )
 
             return jsonify({"jobs": jobs}), 200
 
@@ -1397,7 +1406,7 @@ def create_app(test_config=None):
                 """
                 SELECT id, title, company_name, location,
                        category, description, min_salary,
-                       max_salary, created_at
+                       max_salary, created_at, application_deadline
                 FROM public.jobs
                 WHERE id = %s AND status = 'published'
                 """,
@@ -1414,11 +1423,20 @@ def create_app(test_config=None):
             columns = [column[0] for column in cursor.description]
             job = dict(zip(columns, row))
 
-            # Convert salary values to JSON-friendly numbers.
+            # Convert salary and deadline values to JSON-friendly formats.
             if job["min_salary"] is not None:
                 job["min_salary"] = float(job["min_salary"])
+
             if job["max_salary"] is not None:
                 job["max_salary"] = float(job["max_salary"])
+
+            deadline = job["application_deadline"]
+            if deadline is not None:
+                job["application_deadline"] = (
+                    deadline.isoformat()
+                    if hasattr(deadline, "isoformat")
+                    else str(deadline)
+                )
 
             return jsonify({"job": job}), 200
 

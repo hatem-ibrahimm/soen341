@@ -8,6 +8,11 @@ import {
     listRecruiterApplications,
     updateRecruiterApplicationStatus,
 } from '../services/recruiterApi.js'
+import {
+    listRecruiterInterviews,
+    scheduleRecruiterInterview,
+    updateRecruiterInterview,
+} from '../services/interviewsApi.js'
 
 export default function RecruiterApplicants({ job }) {
     const [expanded, setExpanded] = useState(false)
@@ -18,6 +23,10 @@ export default function RecruiterApplicants({ job }) {
     const [notice, setNotice] = useState('')
     const [selectedId, setSelectedId] = useState(null)
     const [details, setDetails] = useState(null)
+    const [interviews, setInterviews] = useState([])
+    const [interviewDraft, setInterviewDraft] = useState({ scheduled_at: '', location: '', notes: '' })
+    const [savingInterview, setSavingInterview] = useState(false)
+    const [updatingInterviewId, setUpdatingInterviewId] = useState(null)
     const [detailLoading, setDetailLoading] = useState(false)
     const [resumeLoadingId, setResumeLoadingId] = useState(null)
     const [resumeLinks, setResumeLinks] = useState({})
@@ -65,10 +74,16 @@ export default function RecruiterApplicants({ job }) {
         }
         setSelectedId(applicationId)
         setDetails(null)
+        setInterviews([])
         setActionError('')
         setDetailLoading(true)
         try {
-            setDetails(await getRecruiterApplication(applicationId))
+            const [applicationDetails, scheduledInterviews] = await Promise.all([
+                getRecruiterApplication(applicationId),
+                listRecruiterInterviews(applicationId),
+            ])
+            setDetails(applicationDetails)
+            setInterviews(scheduledInterviews)
         } catch (requestError) {
             setActionError(requestError.message || 'Unable to load candidate details.')
         } finally {
@@ -112,6 +127,43 @@ export default function RecruiterApplicants({ job }) {
             setActionError(requestError.message || 'Unable to update application status.')
         } finally {
             setUpdatingId(null)
+        }
+    }
+
+    async function scheduleInterview(event, applicationId) {
+        event.preventDefault()
+        setSavingInterview(true)
+        setActionError('')
+        setNotice('')
+        try {
+            const created = await scheduleRecruiterInterview(applicationId, {
+                ...interviewDraft,
+                scheduled_at: new Date(interviewDraft.scheduled_at).toISOString(),
+            })
+            setInterviews((current) => [...current, created])
+            setInterviewDraft({ scheduled_at: '', location: '', notes: '' })
+            setNotice('Interview scheduled. The applicant has been notified.')
+        } catch (requestError) {
+            setActionError(requestError.message || 'Unable to schedule the interview.')
+        } finally {
+            setSavingInterview(false)
+        }
+    }
+
+    async function updateInterviewStatus(applicationId, interviewId, status) {
+        setUpdatingInterviewId(interviewId)
+        setActionError('')
+        setNotice('')
+        try {
+            const updated = await updateRecruiterInterview(applicationId, interviewId, status)
+            setInterviews((current) => current.map((item) =>
+                String(item.id) === String(interviewId) ? updated : item,
+            ))
+            setNotice('Interview status updated.')
+        } catch (requestError) {
+            setActionError(requestError.message || 'Unable to update interview status.')
+        } finally {
+            setUpdatingInterviewId(null)
         }
     }
 
@@ -250,6 +302,83 @@ export default function RecruiterApplicants({ job }) {
                                                         ) : (
                                                             <p>No resume attached.</p>
                                                         )}
+                                                        <h4>Interviews</h4>
+                                                        {interviews.length ? (
+                                                            <ul className="recruiter-interview-list">
+                                                                {interviews.map((interview) => (
+                                                                    <li key={interview.id}>
+                                                                        <strong>{new Date(interview.scheduled_at).toLocaleString()}</strong>
+                                                                        {interview.location && <span>{interview.location}</span>}
+                                                                        {interview.notes && <p>{interview.notes}</p>}
+                                                                        <label>
+                                                                            Status
+                                                                            <select
+                                                                                value={interview.status}
+                                                                                disabled={updatingInterviewId === interview.id}
+                                                                                onChange={(event) => updateInterviewStatus(
+                                                                                    application.id,
+                                                                                    interview.id,
+                                                                                    event.target.value,
+                                                                                )}
+                                                                            >
+                                                                                <option value="scheduled">Scheduled</option>
+                                                                                <option value="completed">Completed</option>
+                                                                                <option value="cancelled">Cancelled</option>
+                                                                            </select>
+                                                                        </label>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        ) : (
+                                                            <p>No interviews scheduled.</p>
+                                                        )}
+                                                        <form
+                                                            className="recruiter-interview-form"
+                                                            onSubmit={(event) => scheduleInterview(event, application.id)}
+                                                        >
+                                                            <label>
+                                                                Schedule date and time
+                                                                <input
+                                                                    type="datetime-local"
+                                                                    required
+                                                                    value={interviewDraft.scheduled_at}
+                                                                    onChange={(event) => setInterviewDraft((current) => ({
+                                                                        ...current,
+                                                                        scheduled_at: event.target.value,
+                                                                    }))}
+                                                                />
+                                                            </label>
+                                                            <label>
+                                                                Location or meeting link
+                                                                <input
+                                                                    type="text"
+                                                                    maxLength={500}
+                                                                    value={interviewDraft.location}
+                                                                    onChange={(event) => setInterviewDraft((current) => ({
+                                                                        ...current,
+                                                                        location: event.target.value,
+                                                                    }))}
+                                                                />
+                                                            </label>
+                                                            <label>
+                                                                Notes
+                                                                <textarea
+                                                                    maxLength={2000}
+                                                                    value={interviewDraft.notes}
+                                                                    onChange={(event) => setInterviewDraft((current) => ({
+                                                                        ...current,
+                                                                        notes: event.target.value,
+                                                                    }))}
+                                                                />
+                                                            </label>
+                                                            <button
+                                                                type="submit"
+                                                                className="recruiter-secondary-button"
+                                                                disabled={savingInterview}
+                                                            >
+                                                                {savingInterview ? 'Scheduling…' : 'Schedule interview'}
+                                                            </button>
+                                                        </form>
                                                     </>
                                                 ) : null}
                                             </div>

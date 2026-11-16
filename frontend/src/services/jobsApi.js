@@ -34,6 +34,7 @@ export function toJob(raw) {
         required_skills: raw.required_skills ?? [],
         status: raw.status,
         posted_at: raw.created_at,
+        application_deadline: raw.application_deadline ?? null,
         description: raw.description,
     }
 }

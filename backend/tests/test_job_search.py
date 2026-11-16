@@ -15,8 +15,11 @@ JOB_COLUMNS = [
     "location",
     "category",
     "description",
+    "required_skills",
     "min_salary",
     "max_salary",
+    "status",
+    "application_deadline",
     "created_at",
 ]
 
@@ -27,8 +30,11 @@ JOB_ROW = (
     "Montreal, QC",
     "Engineering",
     "Help develop software.",
+    ["Python", "React"],
     50000,
     70000,
+    "published",
+    None,
     None,
 )
 
@@ -125,7 +131,8 @@ def test_keyword_search_uses_all_main_fields(make_client):
 
     assert response.status_code == 200
     assert "ILIKE" in cursor.query
-    assert cursor.params[:5] == (
+    assert cursor.params[:6] == (
+        "%software%",
         "%software%",
         "%software%",
         "%software%",

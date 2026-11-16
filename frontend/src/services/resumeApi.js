@@ -13,15 +13,19 @@ import { delay, fileToDataUrl, newId, readDb, writeDb } from './mockStore.js'
 
 export const MULTIPLE_RESUMES = USE_MOCK_API
 
-export const ALLOWED_RESUME_TYPES = ['application/pdf', 'application/msword']
-export const RESUME_ACCEPT = '.pdf,.doc'
-export const MAX_RESUME_BYTES = 5 * 1024 * 1024
+export const ALLOWED_RESUME_TYPES = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]
+export const RESUME_ACCEPT = '.pdf,.doc,.docx'
+export const MAX_RESUME_BYTES = 10 * 1024 * 1024
 
 export function validateResumeFile(file) {
     if (!file) return 'Please choose a file.'
-    const okType = ALLOWED_RESUME_TYPES.includes(file.type) || /\.(pdf|doc)$/i.test(file.name)
-    if (!okType) return 'Resumes must be a PDF or DOC file.'
-    if (file.size > MAX_RESUME_BYTES) return 'Resumes must be 5 MB or smaller.'
+    const okType = ALLOWED_RESUME_TYPES.includes(file.type) || /\.(pdf|docx?)$/i.test(file.name)
+    if (!okType) return 'Resumes must be a PDF, DOC, or DOCX file.'
+    if (file.size > MAX_RESUME_BYTES) return 'Resumes must be 10 MB or smaller.'
     return ''
 }
 

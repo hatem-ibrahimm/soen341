@@ -17,6 +17,7 @@ const EMPTY_FORM = {
     required_skills: [],
     min_salary: '',
     max_salary: '',
+    application_deadline: '',
     status: 'draft',
 }
 
@@ -34,6 +35,7 @@ function formFromJob(job) {
         required_skills: job.required_skills ?? [],
         min_salary: job.min_salary ?? '',
         max_salary: job.max_salary ?? '',
+        application_deadline: job.application_deadline ?? '',
         status: job.status ?? 'draft',
     }
 }
@@ -190,6 +192,7 @@ function RecruiterDashboard() {
             required_skills: form.required_skills,
             min_salary: form.min_salary === '' ? null : Number(form.min_salary),
             max_salary: form.max_salary === '' ? null : Number(form.max_salary),
+            application_deadline: form.application_deadline || null,
         }
 
         setFormError('')
@@ -265,6 +268,29 @@ function RecruiterDashboard() {
             setNotice('The job posting is closed. Existing applications remain unchanged.')
         } catch (error) {
             setLoadError(error.message || 'Unable to close the job posting.')
+        } finally {
+            setClosingJobId(null)
+        }
+    }
+
+    async function archiveListing(job) {
+        if (!window.confirm(`Archive "${job.title}"? It will be hidden from job search.`)) {
+            return
+        }
+
+        setClosingJobId(job.id)
+        setLoadError('')
+        setNotice('')
+        try {
+            const updated = await updateJobListing(job.id, { status: 'archived' })
+            setJobs((current) =>
+                current.map((item) =>
+                    String(item.id) === String(updated.id) ? updated : item,
+                ),
+            )
+            setNotice('The job posting has been archived.')
+        } catch (error) {
+            setLoadError(error.message || 'Unable to archive the job posting.')
         } finally {
             setClosingJobId(null)
         }
@@ -377,12 +403,15 @@ function RecruiterDashboard() {
                                     name="status"
                                     value={form.status}
                                     onChange={handleChange}
-                                    disabled={form.status === 'closed'}
+                                    disabled={form.status === 'closed' || form.status === 'archived'}
                                 >
                                     <option value="draft">Draft — private</option>
                                     <option value="published">Published — visible in search</option>
                                     {form.status === 'closed' && (
                                         <option value="closed">Closed</option>
+                                    )}
+                                    {form.status === 'archived' && (
+                                        <option value="archived">Archived</option>
                                     )}
                                 </select>
                             </label>
@@ -470,6 +499,16 @@ function RecruiterDashboard() {
                                     placeholder="Optional"
                                 />
                             </label>
+
+                            <label className="recruiter-field">
+                                Application deadline
+                                <input
+                                    name="application_deadline"
+                                    type="date"
+                                    value={form.application_deadline}
+                                    onChange={handleChange}
+                                />
+                            </label>
                         </div>
 
                         {formError && <p className="recruiter-error" role="alert">{formError}</p>}
@@ -527,6 +566,11 @@ function RecruiterDashboard() {
                                         {job.salary && (
                                             <p className="recruiter-listing-meta">{job.salary}</p>
                                         )}
+                                        {job.application_deadline && (
+                                            <p className="recruiter-listing-meta">
+                                                Apply by {job.application_deadline}
+                                            </p>
+                                        )}
                                         {job.required_skills?.length > 0 && (
                                             <p className="recruiter-listing-meta">
                                                 Skills: {job.required_skills.join(', ')}
@@ -548,6 +592,16 @@ function RecruiterDashboard() {
                                                     onClick={() => closeListing(job)}
                                                 >
                                                     {isClosing ? 'Closing…' : 'Close posting'}
+                                                </button>
+                                            )}
+                                            {status !== 'archived' && (
+                                                <button
+                                                    type="button"
+                                                    className="recruiter-secondary-button"
+                                                    disabled={isClosing}
+                                                    onClick={() => archiveListing(job)}
+                                                >
+                                                    {isClosing ? 'Archiving…' : 'Archive'}
                                                 </button>
                                             )}
                                         </div>

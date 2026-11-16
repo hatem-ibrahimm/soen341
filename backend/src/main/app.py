@@ -84,21 +84,6 @@ def create_app(test_config=None):
             app.config["SUPABASE_KEY"],
         )
 
-    def get_supabase_admin():
-        factory = app.config.get("SUPABASE_ADMIN_CLIENT_FACTORY")
-        if factory:
-            return factory()
-        factory = app.config.get("SUPABASE_CLIENT_FACTORY")
-        if factory:
-            return factory()
-
-        service_key = app.config.get("SUPABASE_SERVICE_KEY")
-        if not app.config["SUPABASE_URL"] or not service_key:
-            raise RuntimeError(
-                "SUPABASE_URL and SUPABASE_SERVICE_KEY must be configured."
-            )
-        return create_client(app.config["SUPABASE_URL"], service_key)
-
     def get_storage_supabase():
         factory = app.config.get("SUPABASE_CLIENT_FACTORY")
 
@@ -251,16 +236,6 @@ def create_app(test_config=None):
                 }
             ), 400
 
-        admin_supabase = None
-        if role == "recruiter":
-            try:
-                admin_supabase = get_supabase_admin()
-            except Exception:
-                app.logger.exception("Recruiter registration is not configured.")
-                return jsonify({
-                    "error": "Recruiter registration is currently unavailable."
-                }), 503
-
         try:
             supabase = get_supabase()
 
@@ -289,24 +264,6 @@ def create_app(test_config=None):
 
             if user is None:
                 return jsonify({"error": "Unable to create account."}), 400
-
-            if role == "recruiter":
-                try:
-                    admin_supabase.auth.admin.update_user_by_id(
-                        str(user.id),
-                        {"app_metadata": {"role": "recruiter"}},
-                    )
-                except Exception:
-                    app.logger.exception("Recruiter role provisioning failed.")
-                    try:
-                        admin_supabase.auth.admin.delete_user(str(user.id))
-                    except Exception:
-                        app.logger.exception(
-                            "Failed to clean up an unprovisioned recruiter account."
-                        )
-                    return jsonify({
-                        "error": "Unable to activate recruiter access. Please try again."
-                    }), 503
 
             body = {
                 "message": (

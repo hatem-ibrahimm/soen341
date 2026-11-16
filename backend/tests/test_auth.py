@@ -72,7 +72,7 @@ class AuthApiTests(unittest.TestCase):
         )
         self.assertEqual(response.get_json()["user"]["email"], "parsa@example.com")
 
-    def test_recruiter_registration_requires_company_and_provisions_trusted_role(self):
+    def test_recruiter_registration_uses_signup_metadata_without_admin_access(self):
         self.supabase.auth.sign_up.return_value = auth_response()
         response = self.client.post(
             "/api/auth/register",
@@ -92,10 +92,8 @@ class AuthApiTests(unittest.TestCase):
             signup_payload["options"]["data"]["company_name"],
             "Northwind Labs",
         )
-        self.supabase.auth.admin.update_user_by_id.assert_called_once_with(
-            "11111111-1111-1111-1111-111111111111",
-            {"app_metadata": {"role": "recruiter"}},
-        )
+        self.assertEqual(signup_payload["options"]["data"]["role"], "recruiter")
+        self.supabase.auth.admin.update_user_by_id.assert_not_called()
         self.assertEqual(response.get_json()["user"]["role"], "recruiter")
 
     def test_recruiter_registration_allows_blank_company_name(self):

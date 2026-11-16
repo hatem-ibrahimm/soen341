@@ -31,7 +31,8 @@
     font-weight: 600;
 }
 
-.auth-card input {
+.auth-card input,
+.auth-card select {
     box-sizing: border-box;
     width: 100%;
     padding: 0.7rem 0.8rem;
@@ -40,7 +41,8 @@
     font: inherit;
 }
 
-.auth-card input:focus {
+.auth-card input:focus,
+.auth-card select:focus {
     outline: 2px solid #3659c9;
     outline-offset: 1px;
 }

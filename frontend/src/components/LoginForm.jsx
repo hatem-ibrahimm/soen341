@@ -9,12 +9,13 @@ import {
     PASSWORD_REQUIREMENTS,
     validatePassword,
 } from '../utils/passwordValidation.js'
+import { saveSession } from '../services/session.js'
 import './LoginForm.css'
 
 function getReturnDestination(value) {
     if (
         typeof value === 'string' &&
-        /^\/jobs(?:\/[^?#\\]*)?(?:\?[^#\\]*)?$/.test(value)
+        /^\/jobs(?:\/[^?#\\]*)*(?:\?[^#\\]*)?$/.test(value)
     ) {
         return value
     }
@@ -64,23 +65,18 @@ function LoginForm() {
                 )
             }
 
-            window.localStorage.setItem('token', token)
-
             const userId = response.user?.id
-
-            if (
+            const validUserId = (
                 (typeof userId === 'string' && userId.trim() !== '') ||
                 (typeof userId === 'number' && Number.isFinite(userId))
-            ) {
-                window.localStorage.setItem('userId', String(userId))
-            } else {
-                window.localStorage.removeItem('userId')
-            }
+            ) ? String(userId) : null
+            const role = response.user?.role === 'recruiter' ? 'recruiter' : 'job_seeker'
+            saveSession(token, validUserId, role, response.user?.company_name ?? '')
 
-            navigate(
-                getReturnDestination(location.state?.returnTo),
-                { replace: true },
-            )
+            const destination = role === 'recruiter'
+                ? '/recruiter'
+                : getReturnDestination(location.state?.returnTo ?? location.state?.from)
+            navigate(destination, { replace: true })
         } catch (requestError) {
             setError(
                 requestError.message ||

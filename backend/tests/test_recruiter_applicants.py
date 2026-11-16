@@ -24,7 +24,13 @@ def application_row(*, status="Applied", resume=True, profile=True, details=Fals
         "alex@example.test" if profile else None,
         "resume.pdf" if resume else None,
     )
-    return row + ("Please consider my application.",) if details else row
+    return row + (
+        "Please consider my application.",
+        "Software Engineer",
+        "514-555-0100",
+        "Montreal",
+        "Experienced software engineer.",
+    ) if details else row
 
 
 class RecruiterApplicantsTests(unittest.TestCase):
@@ -63,6 +69,12 @@ class RecruiterApplicantsTests(unittest.TestCase):
             headers=self.headers if headers is None else headers,
         )
 
+    def resume(self, application_id=APPLICATION_ID, headers=None):
+        return self.client.get(
+            f"/api/recruiter/applications/{application_id}/resume",
+            headers=self.headers if headers is None else headers,
+        )
+
     def test_list_requires_authentication(self):
         self.assertEqual(self.list(headers={}).status_code, 401)
         self.connection.cursor.assert_not_called()
@@ -71,10 +83,15 @@ class RecruiterApplicantsTests(unittest.TestCase):
         self.assertEqual(self.detail(headers={}).status_code, 401)
         self.connection.cursor.assert_not_called()
 
+    def test_resume_requires_authentication(self):
+        self.assertEqual(self.resume(headers={}).status_code, 401)
+        self.connection.cursor.assert_not_called()
+
     def test_non_recruiter_is_rejected(self):
         self.metadata = {"role": "job_seeker"}
         self.assertEqual(self.list().status_code, 403)
         self.assertEqual(self.detail().status_code, 403)
+        self.assertEqual(self.resume().status_code, 403)
         self.connection.cursor.assert_not_called()
 
     def test_user_metadata_cannot_grant_recruiter_role(self):
@@ -197,6 +214,8 @@ class RecruiterApplicantsTests(unittest.TestCase):
         application = response.get_json()["application"]
         self.assertEqual(application["cover_letter"], "Please consider my application.")
         self.assertEqual(application["submitted_at"], SUBMITTED_AT.isoformat())
+        self.assertEqual(application["applicant"]["title"], "Software Engineer")
+        self.assertEqual(application["applicant"]["location"], "Montreal")
         sql, args = self.cursor.execute.call_args.args
         self.assertIn("j.recruiter_id = %s", sql)
         self.assertIn("a.id = %s", sql)
@@ -208,6 +227,35 @@ class RecruiterApplicantsTests(unittest.TestCase):
         response = self.detail()
         self.assertEqual(response.status_code, 404)
         self.assertEqual(self.cursor.execute.call_args.args[1], (APPLICATION_ID, RECRUITER_ID))
+
+    def test_resume_download_is_signed_only_for_owned_application(self):
+        self.cursor.fetchone.return_value = ("resume.pdf", "applicant/resume.pdf")
+        self.supabase.storage.from_.return_value.create_signed_url.return_value = {
+            "signedURL": "https://example.test/temporary-resume"
+        }
+
+        response = self.resume()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["resume"], {
+            "file_name": "resume.pdf",
+            "download_url": "https://example.test/temporary-resume",
+        })
+        sql, params = self.cursor.execute.call_args.args
+        self.assertIn("j.recruiter_id = %s", sql)
+        self.assertEqual(params, (APPLICATION_ID, RECRUITER_ID))
+        self.supabase.storage.from_.return_value.create_signed_url.assert_called_once_with(
+            "applicant/resume.pdf",
+            self.app.config["RESUME_SIGNED_URL_SECONDS"],
+        )
+
+    def test_resume_of_another_recruiters_application_is_hidden(self):
+        self.cursor.fetchone.return_value = None
+
+        response = self.resume()
+
+        self.assertEqual(response.status_code, 404)
+        self.supabase.storage.from_.return_value.create_signed_url.assert_not_called()
 
     def test_list_database_failure_is_safe_and_closes_connection(self):
         self.cursor.execute.side_effect = RuntimeError("Database unavailable")

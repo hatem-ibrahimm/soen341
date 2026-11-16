@@ -54,6 +54,8 @@ export default function ApplyPage() {
 
     async function submit(e) {
         e.preventDefault()
+        if (submitting) return
+
         const found = {}
         if (!EMAIL.test(form.email.trim())) found.email = 'Enter a valid email address.'
         if (!form.phone_number.trim()) found.phone_number = 'Phone number is required.'
@@ -72,9 +74,12 @@ export default function ApplyPage() {
                 phone_number: form.phone_number.trim(),
                 cover_letter: form.cover_letter.trim(),
             })
-            navigate(`/applications/${app.id}/submitted`, { replace: true })
+            navigate(`/applications/${app.id}/submitted`, {
+                replace: true,
+                state: { application: app },
+            })
         } catch (err) {
-            setSubmitError(err.message)
+            setSubmitError(err.message || 'Unable to submit your application. Please try again.')
             setSubmitting(false)
         }
     }

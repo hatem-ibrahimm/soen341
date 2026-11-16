@@ -8,10 +8,11 @@
 | --- | --- | --- |
 | `GET` | `/api/recruiter/jobs/<job_id>/applications` | Applications received for one owned job; supports `status`, `limit`, `offset` |
 | `GET` | `/api/recruiter/applications/<application_id>` | Applicant/application details for a job owned by the recruiter, including cover letter |
+| `GET` | `/api/recruiter/applications/<application_id>/resume` | Short-lived resume download URL for an application on an owned job |
 
 All requests require `Authorization: Bearer <SUPABASE_ACCESS_TOKEN>`.
 
-**Security:** Role is granted only from trusted Supabase `app_metadata.role == "recruiter"` or `app_metadata.roles` containing `"recruiter"`, reusing the existing `_recruiter_id()` helper from `recruiter_postings.py`. Client-provided roles and `user_metadata` do not grant access. Both queries restrict results to `jobs.recruiter_id` matching the authenticated user. Requests for records owned by another recruiter return 404. The response contains only candidate name/email, resume file name and ID, application status and timestamps; it does **not** expose raw resume storage paths or a public resume download URL.
+**Security:** Role is granted only from trusted Supabase `app_metadata.role == "recruiter"` or `app_metadata.roles` containing `"recruiter"`, reusing the existing `_recruiter_id()` helper from `recruiter_postings.py`. Client-provided roles and `user_metadata` do not grant access. Applicant and resume queries restrict results to `jobs.recruiter_id` matching the authenticated user. Requests for records owned by another recruiter return 404. Resume storage paths are never returned; a short-lived signed URL is issued only after verifying ownership.
 
 ### List example
 
@@ -59,6 +60,15 @@ Authorization: Bearer <TOKEN>
 
 Returns `{ "application": { ... } }` with the same fields plus `cover_letter` (string or null).
 
+### Resume example
+
+```http
+GET /api/recruiter/applications/22222222-2222-4222-8222-222222222222/resume
+Authorization: Bearer <TOKEN>
+```
+
+Returns `{ "resume": { "file_name": "resume.pdf", "download_url": "<temporary signed URL>" } }`. The signed URL lifetime uses `RESUME_SIGNED_URL_SECONDS`.
+
 ### Query parameters
 
 - `status` (optional): case-sensitive `Applied`, `Under Review`, `Interview`, `Offered`, or `Rejected`.
@@ -75,6 +85,8 @@ Returns `{ "application": { ... } }` with the same fields plus `cover_letter` (s
 - `404` job/application not found or not owned by recruiter.
 - `500` database query failed (server logs the underlying exception).
 
+The recruiter dashboard uses these routes to list applicants, inspect the candidate name/email and cover letter, open an authorized resume link, and update status through `PATCH /api/applications/<application_id>/status`. A status change creates the applicant's in-app notification.
+
 ## Database dependencies (from repository migration)
 
 `supabase/migrations/20261026120200_sprint2_jobs_applications.sql` defines:
@@ -85,7 +97,7 @@ Existing profile and resume migrations supply `public.profiles(id, first_name, l
 
 **Live deployment check still needed:** Confirm these migrations are applied to the Supabase environment used in the demo and that the PostgreSQL connection has SELECT privileges for the related tables. The development team must provision recruiter roles in trusted Supabase `app_metadata`. The migrations alone do not provision recruiter users.
 
-The feature deliberately does not add a resume download route, status mutation, notification delivery, or frontend screen. Recruiter status updates remain handled by Issue #42: `PATCH /api/applications/<application_id>/status`.
+Status mutation remains handled by Issue #42: `PATCH /api/applications/<application_id>/status`; the recruiter review UI does not bypass that ownership check.
 
 ## Testing / CI
 

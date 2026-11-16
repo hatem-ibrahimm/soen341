@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Alert } from '../../components/common'
 import AboutSection from './AboutSection.jsx'
 import EditIntroModal from './EditIntroModal.jsx'
@@ -16,6 +17,12 @@ import styles from './ProfilePage.module.css'
 export default function ProfilePage() {
     const p = useProfile()
     const [editingIntro, setEditingIntro] = useState(false)
+    const { hash } = useLocation()
+
+    // Links like /profile#resumes (from the Resume feedback page) jump to that section.
+    useEffect(() => {
+        if (!p.loading && hash) document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' })
+    }, [p.loading, hash])
 
     if (p.loading) return <p className={styles.placeholder}>Loading your profile…</p>
     if (p.error || !p.profile) return <Alert tone="error">{p.error || 'Could not load your profile.'}</Alert>

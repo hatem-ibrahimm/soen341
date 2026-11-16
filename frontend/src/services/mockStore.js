@@ -3,7 +3,8 @@
 
 import { getToken, saveSession } from './session.js'
 
-const KEY = 'cc_mock_db_v2'
+// v3: Sprint 3 added more sample jobs/applications for the analytics dashboard.
+const KEY = 'cc_mock_db_v3'
 const DEMO_USER_ID = '00000000-0000-4000-8000-000000000001'
 
 const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString()
@@ -67,10 +68,133 @@ export const MOCK_JOBS = [
         posted_at: daysAgo(1),
         description: 'Research, wireframe and prototype flows for a new mobile banking app.',
     },
+    {
+        id: 'job-106',
+        title: 'Frontend Developer Intern',
+        company: 'Larkspur Commerce',
+        location: 'Montréal, QC',
+        type: 'Internship',
+        category: 'Software',
+        salary: '$26/hr',
+        posted_at: daysAgo(3),
+        description: 'Help build the merchant admin in React and TypeScript. Pair programming every day.',
+    },
+    {
+        id: 'job-107',
+        title: 'React Developer',
+        company: 'Bluefin Analytics',
+        location: 'Remote (Canada)',
+        type: 'Full-time',
+        category: 'Software',
+        salary: '$70k – $82k',
+        posted_at: daysAgo(6),
+        description: 'Own charts and reporting screens in a data product used by 300 clients.',
+    },
+    {
+        id: 'job-108',
+        title: 'Junior Full-Stack Developer',
+        company: 'Oakridge Software',
+        location: 'Ottawa, ON',
+        type: 'Full-time',
+        category: 'Software',
+        salary: '$62k – $72k',
+        posted_at: daysAgo(24),
+        description: 'Node, React and PostgreSQL on an internal scheduling tool.',
+    },
+    {
+        id: 'job-109',
+        title: 'Web Developer Co-op',
+        company: 'Saint-Laurent Transit Co.',
+        location: 'Montréal, QC',
+        type: 'Co-op',
+        category: 'Software',
+        salary: '$24/hr',
+        posted_at: daysAgo(19),
+        description: 'Maintain the trip planner website and improve its accessibility.',
+    },
+    {
+        id: 'job-110',
+        title: 'Software Developer Intern',
+        company: 'Hexa Robotics',
+        location: 'Sherbrooke, QC',
+        type: 'Internship',
+        category: 'Software',
+        salary: '$27/hr',
+        posted_at: daysAgo(38),
+        description: 'Write tooling in Python for the robot fleet dashboard.',
+    },
+    {
+        id: 'job-111',
+        title: 'UI Developer',
+        company: 'Cedar & Co. Studio',
+        location: 'Montréal, QC (Hybrid)',
+        type: 'Contract',
+        category: 'Design',
+        salary: '$40/hr',
+        posted_at: daysAgo(44),
+        description: 'Turn Figma designs into clean, responsive pages for client websites.',
+    },
+    {
+        id: 'job-112',
+        title: 'Junior QA Engineer',
+        company: 'Polar Bear Games',
+        location: 'Québec City, QC',
+        type: 'Full-time',
+        category: 'Quality Assurance',
+        salary: '$55k – $63k',
+        posted_at: daysAgo(28),
+        description: 'Test new game builds and write automated smoke tests.',
+    },
+    {
+        id: 'job-113',
+        title: 'Frontend Engineer, Accessibility',
+        company: 'Brightline Learning',
+        location: 'Remote (Canada)',
+        type: 'Full-time',
+        category: 'Software',
+        salary: '$72k – $85k',
+        posted_at: daysAgo(15),
+        description: 'Make our course player usable with screen readers and keyboards.',
+    },
+    {
+        id: 'job-114',
+        title: 'Software Engineer, New Grad',
+        company: 'Gatineau Cloud',
+        location: 'Gatineau, QC',
+        type: 'Full-time',
+        category: 'Software',
+        salary: '$78k – $88k',
+        posted_at: daysAgo(56),
+        description: 'Rotate through three platform teams during your first year.',
+    },
+    {
+        id: 'job-115',
+        title: 'Junior Developer',
+        company: 'Tidewater Logistics',
+        location: 'Halifax, NS (Remote OK)',
+        type: 'Full-time',
+        category: 'Software',
+        salary: '$58k – $66k',
+        posted_at: daysAgo(9),
+        description: 'Small team, lots of ownership: shipment tracking pages and APIs.',
+    },
 ]
 
 function history(...steps) {
     return steps.map(([status, d]) => ({ status, changed_at: daysAgo(d) }))
+}
+
+// Shorthand for a sample application: app(id, jobId, currentStatus, ...[status, daysAgo])
+function app(id, jobId, status, ...steps) {
+    return {
+        id,
+        job_id: jobId,
+        resume_id: 'res-1',
+        cover_letter: '',
+        status,
+        applied_at: daysAgo(steps[0][1]),
+        status_history: history(...steps),
+    }
 }
 
 function seed() {
@@ -158,6 +282,17 @@ function seed() {
                 applied_at: daysAgo(4),
                 status_history: history(['Applied', 4], ['Under Review', 1]),
             },
+            // Sprint 3: extra history so the analytics dashboard has something to show.
+            app('c1a2e3f4-1111-4a6d-9c01-0a0000000106', 'job-106', 'Applied', ['Applied', 1]),
+            app('c1a2e3f4-1111-4a6d-9c01-0a0000000107', 'job-107', 'Applied', ['Applied', 3]),
+            app('c1a2e3f4-1111-4a6d-9c01-0a0000000115', 'job-115', 'Applied', ['Applied', 6]),
+            app('c1a2e3f4-1111-4a6d-9c01-0a0000000113', 'job-113', 'Under Review', ['Applied', 13], ['Under Review', 9]),
+            app('c1a2e3f4-1111-4a6d-9c01-0a0000000109', 'job-109', 'Interview', ['Applied', 16], ['Under Review', 12], ['Interview', 6]),
+            app('c1a2e3f4-1111-4a6d-9c01-0a0000000108', 'job-108', 'Rejected', ['Applied', 20], ['Rejected', 13]),
+            app('c1a2e3f4-1111-4a6d-9c01-0a0000000112', 'job-112', 'Applied', ['Applied', 25]),
+            app('c1a2e3f4-1111-4a6d-9c01-0a0000000110', 'job-110', 'Offered', ['Applied', 34], ['Under Review', 30], ['Interview', 24], ['Offered', 10]),
+            app('c1a2e3f4-1111-4a6d-9c01-0a0000000111', 'job-111', 'Rejected', ['Applied', 41], ['Rejected', 30]),
+            app('c1a2e3f4-1111-4a6d-9c01-0a0000000114', 'job-114', 'Rejected', ['Applied', 52], ['Under Review', 49], ['Rejected', 45]),
         ],
         jobs: MOCK_JOBS,
     }

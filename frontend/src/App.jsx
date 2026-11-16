@@ -6,6 +6,7 @@ import RequireAuth from './components/layout/RequireAuth.jsx'
 import LoginForm from './components/LoginForm.jsx'
 import RegistrationForm from './components/RegistrationForm.jsx'
 import RecruiterDashboard from './components/RecruiterDashboard.jsx'
+import AnalyticsDashboardPage from './features/analytics/AnalyticsDashboardPage.jsx'
 import ApplicationSubmittedPage from './features/applications/ApplicationSubmittedPage.jsx'
 import ApplyPage from './features/applications/ApplyPage.jsx'
 import MyApplicationsPage from './features/applications/MyApplicationsPage.jsx'
@@ -13,6 +14,7 @@ import NotificationsPage from './features/notifications/NotificationsPage.jsx'
 import JobDetailsPlaceholderPage from './features/jobs/JobDetailsPlaceholderPage.jsx'
 import JobsPlaceholderPage from './features/jobs/JobsPlaceholderPage.jsx'
 import ProfilePage from './features/profile/ProfilePage.jsx'
+import ResumeFeedbackPage from './features/resumeFeedback/ResumeFeedbackPage.jsx'
 import { isLoggedIn } from './services/session.js'
 
 function App() {
@@ -34,6 +36,9 @@ function App() {
                     <Route path="/notifications" element={<NotificationsPage />} />
                     <Route path="/recruiter" element={<RecruiterDashboard />} />
                     <Route path="/applications/:applicationId/submitted" element={<ApplicationSubmittedPage />} />
+                    {/* Sprint 3 */}
+                    <Route path="/dashboard" element={<AnalyticsDashboardPage />} />
+                    <Route path="/resume-feedback" element={<ResumeFeedbackPage />} />
                 </Route>
             </Route>
             <Route path="/profilemanagement" element={<Navigate to="/profile" replace />} />

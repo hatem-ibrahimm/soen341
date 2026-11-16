@@ -113,3 +113,117 @@ export async function updateJobListing(jobId, changes) {
     }
     return job
 }
+
+export async function listRecruiterApplications(jobId) {
+    if (USE_MOCK_API) {
+        const db = readDb()
+        const ownsJob = (db.jobs ?? []).some(
+            (job) => String(job.id) === String(jobId) && job.recruiter_id === getUserId(),
+        )
+        if (!ownsJob) throw new Error('Job posting not found.')
+        const applications = (db.applications ?? [])
+            .filter((application) => String(application.job_id) === String(jobId))
+            .map((application) => ({
+                id: String(application.id),
+                job_id: String(application.job_id),
+                resume_id: application.resume_id ?? null,
+                status: application.status,
+                submitted_at: application.applied_at,
+                applicant: {
+                    id: getUserId(),
+                    first_name: db.profile?.first_name ?? '',
+                    last_name: db.profile?.last_name ?? '',
+                    email: db.profile?.email ?? '',
+                },
+                resume: db.resumes?.find(
+                    (resume) => String(resume.id) === String(application.resume_id),
+                ) ?? null,
+            }))
+        return delay(applications)
+    }
+
+    const applications = []
+    let offset = 0
+    let hasMore = true
+    while (hasMore) {
+        const data = await request(
+            `/api/recruiter/jobs/${encodeURIComponent(jobId)}/applications?limit=100&offset=${offset}`,
+        )
+        const page = data.applications ?? []
+        applications.push(...page)
+        hasMore = Boolean(data.pagination?.has_more && page.length)
+        offset += page.length
+    }
+    return applications
+}
+
+export async function getRecruiterApplication(applicationId) {
+    if (USE_MOCK_API) {
+        const application = readDb().applications.find(
+            (item) => String(item.id) === String(applicationId),
+        )
+        if (!application) throw new Error('Application not found.')
+        const listed = (await listRecruiterApplications(application.job_id)).find(
+            (item) => String(item.id) === String(applicationId),
+        )
+        if (!listed) throw new Error('Application not found.')
+        return delay({ ...listed, cover_letter: application.cover_letter ?? '' })
+    }
+    const data = await request(
+        `/api/recruiter/applications/${encodeURIComponent(applicationId)}`,
+    )
+    return data.application
+}
+
+export async function updateRecruiterApplicationStatus(applicationId, status) {
+    if (USE_MOCK_API) {
+        const db = readDb()
+        const application = db.applications.find(
+            (item) => String(item.id) === String(applicationId),
+        )
+        if (!application) throw new Error('Application not found.')
+        const ownsJob = (db.jobs ?? []).some(
+            (job) => String(job.id) === String(application.job_id) && job.recruiter_id === getUserId(),
+        )
+        if (!ownsJob) throw new Error('Application not found.')
+        if (application.status !== status) {
+            application.status = status
+            application.status_history ??= []
+            application.status_history.push({
+                status,
+                changed_at: new Date().toISOString(),
+            })
+            writeDb(db)
+        }
+        return delay(application)
+    }
+    const data = await request(
+        `/api/applications/${encodeURIComponent(applicationId)}/status`,
+        { method: 'PATCH', body: { status } },
+    )
+    return data.application
+}
+
+export async function getRecruiterResumeDownload(applicationId) {
+    if (USE_MOCK_API) {
+        const db = readDb()
+        const application = db.applications.find(
+            (item) => String(item.id) === String(applicationId),
+        )
+        const ownsJob = (db.jobs ?? []).some(
+            (job) =>
+                String(job.id) === String(application?.job_id) &&
+                job.recruiter_id === getUserId(),
+        )
+        if (!ownsJob) throw new Error('Application not found.')
+        const resume = db.resumes?.find(
+            (item) => String(item.id) === String(application?.resume_id),
+        )
+        if (!resume?.file_url) throw new Error('Resume file is unavailable.')
+        return { file_name: resume.file_name, download_url: resume.file_url }
+    }
+    const data = await request(
+        `/api/recruiter/applications/${encodeURIComponent(applicationId)}/resume`,
+    )
+    return data.resume
+}

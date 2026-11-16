@@ -810,6 +810,14 @@ def create_app(test_config=None):
         """Return the configured Supabase Storage bucket."""
         return get_storage_supabase().storage.from_(app.config["RESUME_BUCKET"])
 
+    def get_resume_download_url(storage_path):
+        """Create a short-lived URL for an authorized recruiter review."""
+        result = get_resume_storage().create_signed_url(
+            storage_path,
+            app.config["RESUME_SIGNED_URL_SECONDS"],
+        )
+        return result.get("signedURL") or result.get("signedUrl")
+
     def check_resume_access(profile_id):
         """Allow only the authenticated owner to manage a resume."""
         if not is_valid_uuid(profile_id):
@@ -1384,7 +1392,7 @@ def create_app(test_config=None):
         from recruiter_applicants import register_recruiter_applicant_routes
 
     register_recruiter_applicant_routes(
-        app, get_connection, get_current_user
+        app, get_connection, get_current_user, get_resume_download_url
     )
 
     # Sprint 3 Issue #79: job seeker application analytics.

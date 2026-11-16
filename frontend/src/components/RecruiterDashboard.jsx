@@ -4,6 +4,7 @@ import {
     listRecruiterJobs,
     updateJobListing,
 } from '../services/recruiterApi.js'
+import RecruiterApplicants from './RecruiterApplicants.jsx'
 import './RecruiterDashboard.css'
 
 const EMPTY_FORM = {
@@ -545,6 +546,7 @@ function RecruiterDashboard() {
                                                 </button>
                                             )}
                                         </div>
+                                        <RecruiterApplicants job={job} />
                                     </li>
                                 )
                             })}

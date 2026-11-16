@@ -1,4 +1,75 @@
-﻿SPRINT 2:
+SPRINT 3:
+Task: Review Applicants and Update Their Status — Related to #83
+
+Purpose / Why AI Was Used:
+Help connect the recruiter dashboard to applicant APIs and implement profile viewing, resume access, filtering, sorting, and status updates.
+
+Modifications:
+The AI initially stated that applicant endpoints were missing, then corrected this after finding existing owner-scoped routes. Later changes added filters, full-profile navigation, and mock recruiter data. Attach the relevant code diff.
+
+Validation:
+The AI reported passing backend tests and successful frontend builds, with two existing lint warnings. Team testing must confirm applicant access restrictions, resume access, filters, sorting, and saved status changes.
+
+Reflection / Technical Decision:
+Existing owner-scoped APIs were reused. Resume access required an ownership check. Full professional-profile information remains limited by available backend data.
+
+Responsible Person: Alexi 
+
+Task: S3–T16 — Notifications in the App, #103
+
+Purpose / Why AI Was Used:
+Help create a frontend notification inbox using existing backend endpoints.
+
+Modifications:
+The implementation used existing authenticated endpoints and added badge refresh every 30 seconds. Attach the code diff and identify any team edits.
+
+Validation:
+The AI reported a successful frontend build with two existing lint warnings. Team testing must confirm newest-first ordering, unread counts, read-state persistence, and user-specific access. Interview invitations and deadline reminders were not confirmed.
+
+Reflection / Technical Decision:
+Reusing backend endpoints avoided duplicating notification logic. The implemented notification types must be distinguished from broader requirements.
+
+Responsible Person: Alexi
+
+Task: S3–T17 — Role Choice on the Registration Form, #104
+
+Purpose / Why AI Was Used:
+Help add job-seeker/recruiter registration and role-based login routing.
+
+Modifications:
+The changes extended registration and login behavior. The AI identified that server-side recruiter-role assignment requires SUPABASE_SERVICE_KEY. Attach the code diff and any team changes.
+
+Validation:
+The AI reported 154 passing backend tests and a successful frontend build. Team testing must confirm both registration paths, company-name validation, role persistence, and correct routing.
+
+Final Decision:
+Pending team validation. Record Accepted, Modified before use, or Rejected after review.
+
+Reflection / Technical Decision:
+Recruiter registration requires backend role assignment, not only frontend selection. The service key must remain in the backend.
+
+Responsible Person: Alexi 
+
+ask: S3–US04 — Manage Job Postings from the Recruiter Dashboard, #82
+
+Purpose / Why AI Was Used:
+Help prepare a mock recruiter session for dashboard demonstrations.
+
+Modifications:
+Changes were limited to the mock session and seeded data; real-user roles were reportedly unchanged. Attach the corresponding code diff.
+
+Validation:
+The AI reported a successful frontend build. The supplied conversation does not confirm complete create, edit, publish, close, archive, or ownership-protection functionality. Test these separately against #82’s acceptance criteria.
+
+Final Decision:
+Pending team validation. Do not mark the entire story accepted based only on the demo changes.
+
+Reflection / Technical Decision:
+Mock data made the dashboard easier to demonstrate, but it does not establish that live posting management is complete.
+
+Responsible Person: Alexi
+
+SPRINT 2:
 Task ID/Title: Sprint 2 — Draft frontend user stories, tasks, acceptance criteria, and dependencies
 
 Purpose of AI Use:

@@ -214,21 +214,6 @@ def create_app(test_config=None):
         first_name = str(payload.get("first_name", "")).strip()
         last_name = str(payload.get("last_name", "")).strip()
         role = payload.get("role", "job_seeker")
-        company_name = payload.get("company_name", "")
-
-        if role not in ("job_seeker", "recruiter"):
-            return jsonify({"error": "role must be job_seeker or recruiter."}), 400
-        if not isinstance(company_name, str):
-            return jsonify({"error": "company_name must be text."}), 400
-        company_name = company_name.strip()
-        if role == "recruiter" and (
-            not company_name or len(company_name) > 160
-        ):
-            return jsonify({
-                "error": "Recruiter accounts require a company name of 160 characters or fewer."
-            }), 400
-
-        role = payload.get("role", "job_seeker")
         if not isinstance(role, str) or role not in {"job_seeker", "recruiter"}:
             return jsonify({"error": "role must be job_seeker or recruiter."}), 400
 
@@ -1387,12 +1372,21 @@ def create_app(test_config=None):
                 for row in cursor.fetchall()
             ]
 
-            # Convert salary values to JSON-friendly numbers.
+            # Convert salary and deadline values to JSON-friendly formats.
             for job in jobs:
                 if job["min_salary"] is not None:
                     job["min_salary"] = float(job["min_salary"])
+
                 if job["max_salary"] is not None:
                     job["max_salary"] = float(job["max_salary"])
+
+                deadline = job["application_deadline"]
+                if deadline is not None:
+                    job["application_deadline"] = (
+                        deadline.isoformat()
+                        if hasattr(deadline, "isoformat")
+                        else str(deadline)
+                    )
 
             return jsonify({"jobs": jobs}), 200
 
@@ -1424,12 +1418,7 @@ def create_app(test_config=None):
                        category, description, required_skills, min_salary,
                        max_salary, status, application_deadline, created_at
                 FROM public.jobs
-                WHERE id = %s
-                    AND status = 'published'
-                    AND (
-                        application_deadline IS NULL
-                        OR application_deadline >= CURRENT_DATE
-                    )
+                WHERE id = %s AND status = 'published'
                 """,
                 (job_id,)
             )
@@ -1444,11 +1433,20 @@ def create_app(test_config=None):
             columns = [column[0] for column in cursor.description]
             job = dict(zip(columns, row))
 
-            # Convert salary values to JSON-friendly numbers.
+            # Convert salary and deadline values to JSON-friendly formats.
             if job["min_salary"] is not None:
                 job["min_salary"] = float(job["min_salary"])
+
             if job["max_salary"] is not None:
                 job["max_salary"] = float(job["max_salary"])
+
+            deadline = job["application_deadline"]
+            if deadline is not None:
+                job["application_deadline"] = (
+                    deadline.isoformat()
+                    if hasattr(deadline, "isoformat")
+                    else str(deadline)
+                )
 
             return jsonify({"job": job}), 200
 

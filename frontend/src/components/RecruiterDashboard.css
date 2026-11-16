@@ -88,7 +88,7 @@
 
 .recruiter-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1.7fr) minmax(15rem, 0.9fr);
+    grid-template-columns: minmax(0, 1fr);
     align-items: start;
     gap: 1.25rem;
 }
@@ -108,6 +108,10 @@
     align-items: flex-start;
     justify-content: space-between;
     gap: 1rem;
+    margin-bottom: 0;
+}
+
+.recruiter-panel-heading-open {
     margin-bottom: 1.25rem;
 }
 
@@ -118,6 +122,54 @@
 
 .recruiter-panel-heading p {
     font-size: 0.9rem;
+}
+
+.recruiter-form-toggle {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--cc-text);
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+}
+
+.recruiter-form-toggle > span:first-child {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.recruiter-form-toggle strong {
+    font-size: 1.2rem;
+}
+
+.recruiter-form-toggle small {
+    color: var(--cc-muted);
+    font-size: 0.9rem;
+}
+
+.recruiter-form-toggle-icon {
+    color: var(--cc-primary);
+    font-size: 1.5rem;
+    font-weight: 500;
+}
+
+.recruiter-form-toggle:focus-visible {
+    outline: 2px solid var(--cc-primary);
+    outline-offset: 4px;
+}
+
+.recruiter-form[hidden] {
+    display: none;
+}
+
+.recruiter-postings-panel {
+    min-width: 0;
 }
 
 .recruiter-form-grid {
@@ -316,15 +368,41 @@
     border-radius: var(--cc-radius-sm);
 }
 
-.recruiter-listing h3 {
-    margin: 0 0 0.35rem;
-    font-size: 1rem;
+.recruiter-postings-search {
+    margin: 0 calc(-1 * clamp(1rem, 2.5vw, 1.6rem)) 1rem;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--cc-border);
 }
 
-.recruiter-listing-top {
+.recruiter-postings-search input {
+    width: 100%;
+    padding: 9px 14px;
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-sm);
+    background: var(--cc-bg);
+    color: var(--cc-text);
+    font: inherit;
+}
+
+.recruiter-postings-search input:focus {
+    border-color: var(--cc-primary);
+    outline: none;
+    background: var(--cc-surface);
+}
+
+.recruiter-listing-title-row {
     display: flex;
-    justify-content: flex-end;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
     margin-bottom: 0.4rem;
+}
+
+.recruiter-listing-title-row h3 {
+    min-width: 0;
+    margin: 0;
+    font-size: 1rem;
+    overflow-wrap: anywhere;
 }
 
 .recruiter-status {

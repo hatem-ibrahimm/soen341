@@ -20,7 +20,9 @@ function getReturnDestination(value) {
         return value
     }
 
-    return '/'
+    // Go straight to the jobs page. Sending a logged-in user to '/' showed the
+    // public home page, because App.jsx decides what '/' shows only on first load.
+    return '/jobs'
 }
 
 function LoginForm() {

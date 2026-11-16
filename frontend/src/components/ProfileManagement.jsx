@@ -15,7 +15,7 @@ function ProfileManagement() {
   const [saved, setSaved] = useState(false);
 
   // true while the profile is being loaded from the backend
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(Boolean(userId && token));
 
   // error message to show the user (empty = no error)
   const [error, setError] = useState("");
@@ -37,25 +37,19 @@ function ProfileManagement() {
   const [education, setEducation] = useState([]);
   const [skills, setSkills] = useState([]);
   const [newSkill, setNewSkill] = useState("");
-
-
-
   // Load the profile once when the page opens
   useEffect(() => {
     let ignore = false;
 
     async function loadProfile() {
-      setLoading(true);
-      setError("");
-
       try {
         const data = await getProfile();
 
-        if (!data.profile) {
-          throw new Error("The server did not return your profile.");
-        }
-
         if (ignore) return;
+        if (!data.profile) {
+          setError("The server did not return your profile.");
+          return;
+        }
 
         const p = data.profile;
 
@@ -70,9 +64,7 @@ function ProfileManagement() {
         });
       } catch (requestError) {
         if (!ignore) {
-          setError(
-              requestError.message || "Could not load your profile."
-          );
+          setError(requestError.message || "Could not load your profile.");
         }
       } finally {
         if (!ignore) {
@@ -83,8 +75,6 @@ function ProfileManagement() {
 
     if (userId && token) {
       loadProfile();
-    } else {
-      setLoading(false);
     }
 
     return () => {
@@ -92,16 +82,12 @@ function ProfileManagement() {
     };
   }, [userId, token]);
 
-
-
-  // Personal information 
+  // Personal information
   // name on each input matches the key in profile, so this works for all fields
   function handleProfileChange(e) {
     setProfile({ ...profile, [e.target.name]: e.target.value });
   }
 
-
-  
   // Experience
   function handleExperienceChange(index, e) {
     const updated = [...experiences];
@@ -117,9 +103,7 @@ function ProfileManagement() {
     setExperiences(experiences.filter((item, i) => i !== index));
   }
 
-
-
-  // Education 
+  // Education
   function handleEducationChange(index, e) {
     const updated = [...education];
     updated[index] = { ...updated[index], [e.target.name]: e.target.value };
@@ -134,11 +118,9 @@ function ProfileManagement() {
     setEducation(education.filter((item, i) => i !== index));
   }
 
-
-
   // Skills
   function addSkill(e) {
-    e.preventDefault();  // stops the page from refreshing
+    e.preventDefault(); // stops the page from refreshing
     if (newSkill.trim() === "") return;
     setSkills([...skills, newSkill.trim()]);
     setNewSkill("");
@@ -147,8 +129,6 @@ function ProfileManagement() {
   function removeSkill(skillToRemove) {
     setSkills(skills.filter((skill) => skill !== skillToRemove));
   }
-
-
 
   // Save: send the personal info to the backend
   async function handleSave() {
@@ -161,9 +141,7 @@ function ProfileManagement() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (requestError) {
-      setError(
-          requestError.message || "Could not save your profile."
-      );
+      setError(requestError.message || "Could not save your profile.");
     }
   }
 
@@ -172,7 +150,6 @@ function ProfileManagement() {
     { id: "experience", label: "Work experience" },
     { id: "education", label: "Education" },
     { id: "skills", label: "Skills" },
-    
   ];
 
   // not logged in: nothing to load
@@ -268,7 +245,6 @@ function ProfileManagement() {
               </div>
             </div>
           )}
-      
 
           {activeTab === "experience" && (
             <div>
@@ -377,30 +353,30 @@ function ProfileManagement() {
           {/* One Save button shared by every tab */}
           <div className="save-row">
             {activeTab === "personal" ? (
-                <>
-                  <button
-                      className="btn-primary"
-                      onClick={handleSave}
-                      disabled={!userId || !token}
-                  >
-                    Save personal information
-                  </button>
+              <>
+                <button
+                  className="btn-primary"
+                  onClick={handleSave}
+                  disabled={!userId || !token}
+                >
+                  Save personal information
+                </button>
 
-                  {saved && (
-                      <span className="saved" role="status">
-                        Personal information saved
-                      </span>
-                  )}
-                </>
+                {saved && (
+                  <span className="saved" role="status">
+                    Personal information saved
+                  </span>
+                )}
+              </>
             ) : (
-                <p className="muted" role="status">
-                  Changes in this section are temporary and are not saved yet.
-                </p>
+              <p className="muted" role="status">
+                Changes in this section are temporary and are not saved yet.
+              </p>
             )}
-              {error && (
-                <span className="error" role="alert">
-                  {error}
-                </span>
+            {error && (
+              <span className="error" role="alert">
+                {error}
+              </span>
             )}
           </div>
         </div>

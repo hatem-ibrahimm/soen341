@@ -1,4 +1,4 @@
-.wrap { max-width: 760px; margin: 0 auto; }
+.wrap { max-width: 900px; margin: 0 auto; }
 .banner {
   font-size: 0.85rem; padding: 10px 14px; border-radius: var(--cc-radius-sm);
   background: var(--cc-warning-soft); color: #6b4300; margin-bottom: 18px;
@@ -9,7 +9,8 @@
   margin-bottom: 16px; padding: 18px; border: 1px solid var(--cc-border);
   border-radius: var(--cc-radius-sm); background: var(--cc-surface);
 }
-.filterGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.filterGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.salarySearchRow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; gap: 16px; margin-top: 16px; }
 .filterField { min-width: 0; }
 .filterField label { display: block; margin-bottom: 6px; font-weight: 600; }
 .filterField input {
@@ -19,8 +20,8 @@
 }
 .filterField input[aria-invalid="true"] { border: 2px solid #a31515; }
 .fieldError { margin: 6px 0 0; color: #a31515; }
-.filterHint { margin: 14px 0; color: var(--cc-muted); font-size: 0.9rem; }
-.searchActions { display: flex; flex-wrap: wrap; gap: 12px; }
+.filterHint { margin: 12px 0 0; color: var(--cc-muted); font-size: 0.9rem; }
+.searchActions { display: flex; flex-wrap: wrap; gap: 8px; }
 .searchActions button {
   min-height: 44px; padding: 10px 16px; border: 1px solid var(--cc-primary);
   border-radius: var(--cc-radius-sm); background: var(--cc-primary);
@@ -31,12 +32,17 @@
 .listCard { padding: 0 !important; }
 .list { list-style: none; margin: 0; padding: 0; }
 .emptyState { margin: 0; padding: 20px; color: var(--cc-muted); }
+.resultCount { margin: 0; padding: 14px 20px; color: var(--cc-muted); }
 .job { display: flex; gap: 14px; padding: 16px 20px; border-top: 1px solid var(--cc-border); align-items: flex-start; }
 .job:first-child { border-top: 0; }
 .info { flex: 1; min-width: 0; }
 .info h2 { margin: 0; font-size: 1.02rem; color: var(--cc-primary); }
 .info p { margin: 2px 0 0; font-size: 0.92rem; }
 .muted { color: var(--cc-muted); font-size: 0.85rem !important; }
+.description { margin-top: 10px !important; color: var(--cc-text); }
+.skills { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0; padding: 0; list-style: none; }
+.skills li { padding: 4px 9px; border-radius: var(--cc-radius-sm); background: var(--cc-primary-soft); color: var(--cc-text); font-size: 0.82rem; }
+.detailsLink { display: inline-block; margin-top: 8px; color: var(--cc-primary); font-size: 0.9rem; font-weight: 600; }
 .apply, .applied {
   padding: 7px 18px; border-radius: var(--cc-radius-sm); font-weight: 600; font-size: 0.9rem;
   text-decoration: none; white-space: nowrap; align-self: center;
@@ -49,5 +55,26 @@
 .titleLink:hover { text-decoration: underline; }
 .back { display: inline-block; margin-bottom: 12px; color: var(--cc-muted); text-decoration: none; font-weight: 600; font-size: 0.9rem; }
 .back:hover { color: var(--cc-text); }
+.loading { color: var(--cc-muted); }
+.detailCard { padding: 24px !important; }
+.detailHeader { display: flex; align-items: center; gap: 16px; }
+.detailTitle { margin: 0; font-size: 1.5rem; }
+.detailCompany { margin: 5px 0 0; color: var(--cc-muted); font-size: 1.05rem; }
+.detailFacts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin: 24px 0; padding: 16px 0; border-top: 1px solid var(--cc-border); border-bottom: 1px solid var(--cc-border); }
+.detailFacts dt { color: var(--cc-muted); font-size: 0.82rem; font-weight: 600; }
+.detailFacts dd { margin: 4px 0 0; }
+.detailSection + .detailSection { margin-top: 24px; }
+.detailSection h2 { margin: 0 0 10px; font-size: 1.1rem; }
+.detailSection p { white-space: pre-line; line-height: 1.6; }
 .detailActions { display: flex; justify-content: flex-end; margin-top: 16px; }
-@media (max-width: 520px) { .searchActions button { width: 100%; } }
+@media (max-width: 720px) {
+  .filterGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .salarySearchRow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .searchActions { grid-column: 1 / -1; }
+}
+@media (max-width: 520px) {
+  .filterGrid,
+  .salarySearchRow { grid-template-columns: minmax(0, 1fr); }
+  .searchActions { grid-column: auto; }
+  .searchActions button { flex: 1; }
+}

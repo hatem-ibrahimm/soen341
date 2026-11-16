@@ -24,8 +24,23 @@ export function CurrentUserProvider({ children }) {
     // itself does not need to know about this).
     const loggedIn = isLoggedIn()
     useEffect(() => {
-        if (loggedIn && !user) refresh()
-    }, [loggedIn, user, refresh, location.pathname])
+        if (!loggedIn || user) return
+
+        let ignore = false
+        async function loadUser() {
+            try {
+                const { profile } = await getFullProfile()
+                if (!ignore) setUser(profile)
+            } catch {
+                if (!ignore) setUser(null)
+            }
+        }
+
+        loadUser()
+        return () => {
+            ignore = true
+        }
+    }, [loggedIn, user, location.pathname])
 
     return (
         <CurrentUserContext.Provider value={{ user, setUser, refresh }}>

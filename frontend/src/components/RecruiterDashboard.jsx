@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
     createJobListing,
     listRecruiterJobs,
@@ -44,12 +44,14 @@ function RecruiterDashboard() {
     const [loadError, setLoadError] = useState('')
     const [retryCount, setRetryCount] = useState(0)
     const [editingJob, setEditingJob] = useState(null)
+    const [isFormOpen, setIsFormOpen] = useState(false)
     const [form, setForm] = useState(emptyForm)
     const [skillDraft, setSkillDraft] = useState('')
     const [formError, setFormError] = useState('')
     const [notice, setNotice] = useState('')
     const [isSaving, setIsSaving] = useState(false)
     const [closingJobId, setClosingJobId] = useState(null)
+    const [postingsQuery, setPostingsQuery] = useState('')
 
     useEffect(() => {
         let active = true
@@ -216,6 +218,7 @@ function RecruiterDashboard() {
             setEditingJob(null)
             setForm(emptyForm())
             setSkillDraft('')
+            setIsFormOpen(false)
         } catch (error) {
             setFormError(error.message || 'Unable to save the job posting.')
         } finally {
@@ -229,6 +232,7 @@ function RecruiterDashboard() {
         setSkillDraft('')
         setFormError('')
         setNotice('')
+        setIsFormOpen(true)
     }
 
     function startEdit(job) {
@@ -237,6 +241,7 @@ function RecruiterDashboard() {
         setSkillDraft('')
         setFormError('')
         setNotice('')
+        setIsFormOpen(true)
     }
 
     async function closeListing(job) {
@@ -271,6 +276,15 @@ function RecruiterDashboard() {
     }
 
     const isEditing = Boolean(editingJob)
+    const visibleJobs = useMemo(() => {
+        const query = postingsQuery.trim().toLocaleLowerCase()
+        if (!query) return jobs
+
+        return jobs.filter((job) =>
+            [job.title, job.company_name ?? job.company, job.location, job.category]
+                .some((value) => value?.toLocaleLowerCase().includes(query)),
+        )
+    }, [jobs, postingsQuery])
 
     return (
         <div className="recruiter-dashboard">
@@ -303,17 +317,29 @@ function RecruiterDashboard() {
 
             <div className="recruiter-layout">
                 <section className="recruiter-panel" aria-labelledby="posting-form-heading">
-                    <div className="recruiter-panel-heading">
-                        <div>
-                            <h2 id="posting-form-heading">
-                                {isEditing ? 'Edit job posting' : 'Create a job posting'}
-                            </h2>
-                            <p>
-                                {isEditing
-                                    ? 'Update your role details and publication status.'
-                                    : 'Draft postings stay private. Published postings appear in job search.'}
-                            </p>
-                        </div>
+                    <div className={`recruiter-panel-heading${isFormOpen ? ' recruiter-panel-heading-open' : ''}`}>
+                        <button
+                            type="button"
+                            id="posting-form-heading"
+                            className="recruiter-form-toggle"
+                            aria-expanded={isFormOpen}
+                            aria-controls="job-posting-form"
+                            onClick={() => setIsFormOpen((open) => !open)}
+                        >
+                            <span>
+                                <strong>{isEditing ? 'Edit job posting' : 'Create a job listing'}</strong>
+                                {isFormOpen && (
+                                    <small>
+                                        {isEditing
+                                            ? 'Update your role details and publication status.'
+                                            : 'Draft postings stay private. Published postings appear in job search.'}
+                                    </small>
+                                )}
+                            </span>
+                            <span className="recruiter-form-toggle-icon" aria-hidden="true">
+                                {isFormOpen ? '−' : '+'}
+                            </span>
+                        </button>
                         {isEditing && (
                             <button
                                 type="button"
@@ -325,7 +351,13 @@ function RecruiterDashboard() {
                         )}
                     </div>
 
-                    <form className="recruiter-form" onSubmit={handleSubmit} noValidate>
+                    <form
+                        id="job-posting-form"
+                        className="recruiter-form"
+                        onSubmit={handleSubmit}
+                        noValidate
+                        hidden={!isFormOpen}
+                    >
                         <div className="recruiter-form-grid">
                             <label className="recruiter-field recruiter-field-full">
                                 Job title
@@ -497,7 +529,7 @@ function RecruiterDashboard() {
                     </form>
                 </section>
 
-                <aside className="recruiter-side-panel" aria-labelledby="your-postings-heading">
+                <section className="recruiter-panel recruiter-postings-panel" aria-labelledby="your-postings-heading">
                     <div className="recruiter-panel-heading">
                         <div>
                             <h2 id="your-postings-heading">Your job postings</h2>
@@ -505,21 +537,31 @@ function RecruiterDashboard() {
                         </div>
                     </div>
 
+                    <div className="recruiter-postings-search">
+                        <input
+                            type="search"
+                            placeholder="Search by job title or company"
+                            value={postingsQuery}
+                            onChange={(event) => setPostingsQuery(event.target.value)}
+                            aria-label="Search job postings"
+                        />
+                    </div>
+
                     {loading ? (
                         <p className="recruiter-empty" role="status">Loading your postings…</p>
                     ) : jobs.length ? (
                         <ul className="recruiter-listings">
-                            {jobs.map((job) => {
+                            {visibleJobs.map((job) => {
                                 const status = job.status ?? 'published'
                                 const isClosing = String(closingJobId) === String(job.id)
                                 return (
                                     <li key={job.id} className="recruiter-listing">
-                                        <div className="recruiter-listing-top">
+                                        <div className="recruiter-listing-title-row">
+                                            <h3>{job.title}</h3>
                                             <span className={`recruiter-status recruiter-status-${status}`}>
                                                 {status}
                                             </span>
                                         </div>
-                                        <h3>{job.title}</h3>
                                         <p>{job.company_name ?? job.company}</p>
                                         <p className="recruiter-listing-meta">
                                             {job.location} · {job.category}
@@ -555,13 +597,18 @@ function RecruiterDashboard() {
                                     </li>
                                 )
                             })}
+                            {visibleJobs.length === 0 && (
+                                <li className="recruiter-empty" role="status">
+                                    No postings match your search.
+                                </li>
+                            )}
                         </ul>
                     ) : loadError ? null : (
                         <p className="recruiter-empty" role="status">
                             You have no job postings yet. Create a draft or publish an opening.
                         </p>
                     )}
-                </aside>
+                </section>
             </div>
         </div>
     )

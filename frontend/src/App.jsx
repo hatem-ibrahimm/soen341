@@ -36,8 +36,8 @@ function App() {
             {/* Logged-in pages share the top bar with the profile circle */}
             <Route element={<RequireAuth />}>
                 <Route element={<AppLayout />}>
-                    <Route path="/jobs" element={<JobsPlaceholderPage />} />
-                    <Route path="/jobs/:jobId" element={<JobDetailsPlaceholderPage />} />
+                    <Route path="/jobs" element={<JobsPlaceholderPage/>} />
+                    <Route path="/jobs/:jobId" element={<JobDetailsPlaceholderPage/>} />
                     <Route path="/jobs/:jobId/apply" element={<ApplyPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/applications" element={<MyApplicationsPage />} />

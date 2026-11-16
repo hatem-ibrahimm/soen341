@@ -1,3 +1,9 @@
+"""Sprint 3: Recruiter-only applicant listing and detail APIs.
+
+Uses existing Flask/Supabase authentication and the Sprint 2 jobs/applications
+schema. No database migrations or changes to existing application logic.
+"""
+
 import uuid
 
 from flask import jsonify, request

@@ -17,6 +17,7 @@ DECLARE
   v_app uuid;
   v_resume uuid;
   v_notif uuid;
+  v_interview uuid;
   n int;
   ok boolean;
 BEGIN
@@ -284,6 +285,75 @@ BEGIN
       RESET ROLE;
     EXCEPTION WHEN OTHERS THEN
       results := results || jsonb_build_object('feature', 'Recruiter accounts', 'test', 'AT-S3-R',
+        'checks', 'could not run', 'result', 'ERROR: ' || SQLERRM);
+    END;
+
+    -- ---------------------------------------------------------------------
+    -- Reminders: application deadlines and interview invitations
+    -- ---------------------------------------------------------------------
+    BEGIN
+      PERFORM set_config('request.jwt.claim.sub', recruiter::text, true);
+      PERFORM set_config('request.jwt.claims', json_build_object('sub', recruiter, 'role', 'authenticated')::text, true);
+      SET LOCAL ROLE authenticated;
+
+      UPDATE public.jobs SET application_deadline = current_date + 7 WHERE id = v_job;
+      INSERT INTO public.interviews (application_id, scheduled_at, location)
+      VALUES (v_app, now() + interval '2 days', 'Room 101')
+      RETURNING id INTO v_interview;
+
+      PERFORM set_config('request.jwt.claim.sub', seeker::text, true);
+      PERFORM set_config('request.jwt.claims', json_build_object('sub', seeker, 'role', 'authenticated')::text, true);
+
+      results := results || jsonb_build_object('feature', 'Reminders', 'test', 'AT-S3-M1',
+        'checks', 'a recruiter can set a deadline on a posting and job seekers see it',
+        'result', CASE WHEN (SELECT application_deadline FROM public.jobs WHERE id = v_job) = current_date + 7
+                       THEN 'PASS' ELSE 'FAIL' END);
+
+      results := results || jsonb_build_object('feature', 'Reminders', 'test', 'AT-S3-M2',
+        'checks', 'a recruiter can schedule an interview and the applicant sees it',
+        'result', CASE WHEN (SELECT location FROM public.interviews WHERE id = v_interview) = 'Room 101'
+                       THEN 'PASS' ELSE 'FAIL' END);
+
+      SELECT count(*) INTO n FROM public.interviews
+      WHERE status = 'scheduled' AND scheduled_at BETWEEN now() AND now() + interval '7 days';
+      results := results || jsonb_build_object('feature', 'Reminders', 'test', 'AT-S3-M3',
+        'checks', 'upcoming interviews can be listed for reminders',
+        'result', CASE WHEN n = 1 THEN 'PASS' ELSE 'FAIL' END);
+
+      UPDATE public.interviews SET scheduled_at = now() + interval '30 days' WHERE id = v_interview;
+      ok := false;
+      BEGIN
+        INSERT INTO public.interviews (application_id, scheduled_at) VALUES (v_app, now() + interval '1 day');
+      EXCEPTION WHEN insufficient_privilege THEN ok := true;
+      END;
+      results := results || jsonb_build_object('feature', 'Reminders', 'test', 'AT-S3-M4',
+        'checks', 'an applicant cannot schedule or move an interview themselves',
+        'result', CASE WHEN ok AND (SELECT scheduled_at FROM public.interviews WHERE id = v_interview) < now() + interval '3 days'
+                       THEN 'PASS' ELSE 'FAIL' END);
+
+      PERFORM set_config('request.jwt.claim.sub', rival::text, true);
+      PERFORM set_config('request.jwt.claims', json_build_object('sub', rival, 'role', 'authenticated')::text, true);
+      ok := false;
+      BEGIN
+        INSERT INTO public.interviews (application_id, scheduled_at) VALUES (v_app, now() + interval '1 day');
+      EXCEPTION WHEN insufficient_privilege THEN ok := true;
+      END;
+      results := results || jsonb_build_object('feature', 'Reminders', 'test', 'AT-S3-M5',
+        'checks', 'another recruiter cannot see or schedule interviews for this application',
+        'result', CASE WHEN ok AND NOT EXISTS (SELECT 1 FROM public.interviews WHERE id = v_interview)
+                       THEN 'PASS' ELSE 'FAIL' END);
+      RESET ROLE;
+
+      ok := false;
+      BEGIN
+        UPDATE public.interviews SET status = 'postponed' WHERE id = v_interview;
+      EXCEPTION WHEN check_violation THEN ok := true;
+      END;
+      results := results || jsonb_build_object('feature', 'Reminders', 'test', 'AT-S3-M6',
+        'checks', 'an unknown interview status is rejected',
+        'result', CASE WHEN ok THEN 'PASS' ELSE 'FAIL' END);
+    EXCEPTION WHEN OTHERS THEN
+      results := results || jsonb_build_object('feature', 'Reminders', 'test', 'AT-S3-M',
         'checks', 'could not run', 'result', 'ERROR: ' || SQLERRM);
     END;
 

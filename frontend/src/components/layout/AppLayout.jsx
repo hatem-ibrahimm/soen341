@@ -1,10 +1,37 @@
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import DemoBar from './DemoBar.jsx'
 import ProfileMenu from './ProfileMenu.jsx'
 import styles from './AppLayout.module.css'
+import { getUnreadNotificationCount } from '../../services/notificationsApi.js'
 
 // Top bar + page container shared by every logged-in page.
 export default function AppLayout() {
+    const [unreadCount, setUnreadCount] = useState(null)
+    const [unreadError, setUnreadError] = useState(false)
+    const location = useLocation()
+    const refreshUnreadCount = useCallback(() => {
+        getUnreadNotificationCount()
+            .then((count) => {
+                setUnreadCount(count)
+                setUnreadError(false)
+            })
+            .catch(() => {
+                setUnreadCount(null)
+                setUnreadError(true)
+            })
+    }, [])
+
+    useEffect(() => {
+        refreshUnreadCount()
+        const interval = window.setInterval(refreshUnreadCount, 30_000)
+        window.addEventListener('notifications:updated', refreshUnreadCount)
+        return () => {
+            window.clearInterval(interval)
+            window.removeEventListener('notifications:updated', refreshUnreadCount)
+        }
+    }, [refreshUnreadCount, location.pathname])
+
     const navClass = ({ isActive }) => `${styles.navLink} ${isActive ? styles.active : ''}`
     return (
         <div className={styles.shell}>
@@ -19,6 +46,23 @@ export default function AppLayout() {
                         </NavLink>
                         <NavLink to="/applications" className={navClass}>
                             My applications
+                        </NavLink>
+                        <NavLink
+                            to="/notifications"
+                            className={navClass}
+                            aria-label={unreadError ? 'Notifications; unread count unavailable' : 'Notifications'}
+                        >
+                            Notifications
+                            {unreadCount > 0 && (
+                                <span className={styles.notificationCount} aria-label={`${unreadCount} unread`}>
+                                    {unreadCount > 99 ? '99+' : unreadCount}
+                                </span>
+                            )}
+                            {unreadError && (
+                                <span className={styles.notificationError} title="Unable to load unread notification count">
+                                    !
+                                </span>
+                            )}
                         </NavLink>
                         <NavLink to="/recruiter" className={navClass}>
                             Recruiter dashboard

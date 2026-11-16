@@ -9,6 +9,7 @@ import RecruiterDashboard from './components/RecruiterDashboard.jsx'
 import ApplicationSubmittedPage from './features/applications/ApplicationSubmittedPage.jsx'
 import ApplyPage from './features/applications/ApplyPage.jsx'
 import MyApplicationsPage from './features/applications/MyApplicationsPage.jsx'
+import NotificationsPage from './features/notifications/NotificationsPage.jsx'
 import JobDetailsPlaceholderPage from './features/jobs/JobDetailsPlaceholderPage.jsx'
 import JobsPlaceholderPage from './features/jobs/JobsPlaceholderPage.jsx'
 import ProfilePage from './features/profile/ProfilePage.jsx'
@@ -30,6 +31,7 @@ function App() {
                     <Route path="/jobs/:jobId/apply" element={<ApplyPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/applications" element={<MyApplicationsPage />} />
+                    <Route path="/notifications" element={<NotificationsPage />} />
                     <Route path="/recruiter" element={<RecruiterDashboard />} />
                     <Route path="/applications/:applicationId/submitted" element={<ApplicationSubmittedPage />} />
                 </Route>

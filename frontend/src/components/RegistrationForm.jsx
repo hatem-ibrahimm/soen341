@@ -7,6 +7,7 @@ import './RegistrationForm.css'
 function RegistrationForm() {
     const [error, setError] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [role, setRole] = useState('job_seeker')
     const navigate = useNavigate()
 
     async function handleSubmit(event) {
@@ -16,6 +17,7 @@ function RegistrationForm() {
         const formData = new FormData(event.currentTarget)
         const password = formData.get('password')
         const confirmPassword = formData.get('confirmPassword')
+        const companyName = String(formData.get('companyName') ?? '').trim()
 
         const passwordError = validatePassword(password)
 
@@ -27,14 +29,20 @@ function RegistrationForm() {
             setError('Passwords do not match.')
             return
         }
+        if (role === 'recruiter' && !companyName) {
+            setError('Company name is required for recruiter accounts.')
+            return
+        }
 
         setIsSubmitting(true)
         try {
             await register({
-                email: formData.get('email').trim(),
+                email: String(formData.get('email') ?? '').trim(),
                 password,
-                firstName: formData.get('firstName').trim(),
-                lastName: formData.get('lastName').trim(),
+                firstName: String(formData.get('firstName') ?? '').trim(),
+                lastName: String(formData.get('lastName') ?? '').trim(),
+                role,
+                companyName,
             })
             navigate('/login', {
                 replace: true,
@@ -70,6 +78,32 @@ function RegistrationForm() {
                             required
                         />
                     </label>
+                    <label>
+                        Account type
+                        <select
+                            name="role"
+                            value={role}
+                            onChange={(event) => {
+                                setRole(event.target.value)
+                                setError('')
+                            }}
+                        >
+                            <option value="job_seeker">Job seeker</option>
+                            <option value="recruiter">Recruiter</option>
+                        </select>
+                    </label>
+                    {role === 'recruiter' && (
+                        <label>
+                            Company name
+                            <input
+                                type="text"
+                                name="companyName"
+                                autoComplete="organization"
+                                maxLength={160}
+                                required
+                            />
+                        </label>
+                    )}
                     <label>
                         Email
                         <input

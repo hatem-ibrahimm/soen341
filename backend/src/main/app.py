@@ -84,6 +84,21 @@ def create_app(test_config=None):
             app.config["SUPABASE_KEY"],
         )
 
+    def get_supabase_admin():
+        factory = app.config.get("SUPABASE_ADMIN_CLIENT_FACTORY")
+        if factory:
+            return factory()
+        factory = app.config.get("SUPABASE_CLIENT_FACTORY")
+        if factory:
+            return factory()
+
+        service_key = app.config.get("SUPABASE_SERVICE_KEY")
+        if not app.config["SUPABASE_URL"] or not service_key:
+            raise RuntimeError(
+                "SUPABASE_URL and SUPABASE_SERVICE_KEY must be configured."
+            )
+        return create_client(app.config["SUPABASE_URL"], service_key)
+
     def get_storage_supabase():
         factory = app.config.get("SUPABASE_CLIENT_FACTORY")
 
@@ -198,6 +213,20 @@ def create_app(test_config=None):
         password = str(payload.get("password", ""))
         first_name = str(payload.get("first_name", "")).strip()
         last_name = str(payload.get("last_name", "")).strip()
+        role = payload.get("role", "job_seeker")
+        company_name = payload.get("company_name", "")
+
+        if role not in ("job_seeker", "recruiter"):
+            return jsonify({"error": "role must be job_seeker or recruiter."}), 400
+        if not isinstance(company_name, str):
+            return jsonify({"error": "company_name must be text."}), 400
+        company_name = company_name.strip()
+        if role == "recruiter" and (
+            not company_name or len(company_name) > 160
+        ):
+            return jsonify({
+                "error": "Recruiter accounts require a company name of 160 characters or fewer."
+            }), 400
 
         role = payload.get("role", "job_seeker")
         if not isinstance(role, str) or role not in {"job_seeker", "recruiter"}:
@@ -237,6 +266,16 @@ def create_app(test_config=None):
                 }
             ), 400
 
+        admin_supabase = None
+        if role == "recruiter":
+            try:
+                admin_supabase = get_supabase_admin()
+            except Exception:
+                app.logger.exception("Recruiter registration is not configured.")
+                return jsonify({
+                    "error": "Recruiter registration is currently unavailable."
+                }), 503
+
         try:
             supabase = get_supabase()
 
@@ -266,6 +305,24 @@ def create_app(test_config=None):
             if user is None:
                 return jsonify({"error": "Unable to create account."}), 400
 
+            if role == "recruiter":
+                try:
+                    admin_supabase.auth.admin.update_user_by_id(
+                        str(user.id),
+                        {"app_metadata": {"role": "recruiter"}},
+                    )
+                except Exception:
+                    app.logger.exception("Recruiter role provisioning failed.")
+                    try:
+                        admin_supabase.auth.admin.delete_user(str(user.id))
+                    except Exception:
+                        app.logger.exception(
+                            "Failed to clean up an unprovisioned recruiter account."
+                        )
+                    return jsonify({
+                        "error": "Unable to activate recruiter access. Please try again."
+                    }), 503
+
             body = {
                 "message": (
                     "Account created successfully."
@@ -275,6 +332,8 @@ def create_app(test_config=None):
                 "user": {
                     "id": str(user.id),
                     "email": user.email,
+                    "role": role,
+                    "company_name": company_name if role == "recruiter" else "",
                 },
                 "email_confirmation_required": session is None,
             }
@@ -855,6 +914,14 @@ def create_app(test_config=None):
     def get_resume_storage():
         """Return the configured Supabase Storage bucket."""
         return get_storage_supabase().storage.from_(app.config["RESUME_BUCKET"])
+
+    def get_resume_download_url(storage_path):
+        """Create a short-lived URL for an authorized recruiter review."""
+        result = get_resume_storage().create_signed_url(
+            storage_path,
+            app.config["RESUME_SIGNED_URL_SECONDS"],
+        )
+        return result.get("signedURL") or result.get("signedUrl")
 
     def check_resume_access(profile_id):
         """Allow only the authenticated owner to manage a resume."""

@@ -9,8 +9,15 @@ def auth_response(
     email="parsa@example.com",
     user_id="11111111-1111-1111-1111-111111111111",
     with_session=True,
+    app_metadata=None,
+    user_metadata=None,
 ):
-    user = SimpleNamespace(id=user_id, email=email)
+    user = SimpleNamespace(
+        id=user_id,
+        email=email,
+        app_metadata=app_metadata or {},
+        user_metadata=user_metadata or {},
+    )
     session = None
     if with_session:
         session = SimpleNamespace(
@@ -65,6 +72,56 @@ class AuthApiTests(unittest.TestCase):
         )
         self.assertEqual(response.get_json()["user"]["email"], "parsa@example.com")
 
+    def test_recruiter_registration_requires_company_and_provisions_trusted_role(self):
+        self.supabase.auth.sign_up.return_value = auth_response()
+        response = self.client.post(
+            "/api/auth/register",
+            json={
+                "email": "recruiter@example.com",
+                "password": "StrongPass123",
+                "first_name": "Rae",
+                "last_name": "Recruiter",
+                "role": "recruiter",
+                "company_name": "Northwind Labs",
+            },
+        )
+
+        self.assertEqual(response.status_code, 201)
+        signup_payload = self.supabase.auth.sign_up.call_args.args[0]
+        self.assertEqual(
+            signup_payload["options"]["data"]["company_name"],
+            "Northwind Labs",
+        )
+        self.supabase.auth.admin.update_user_by_id.assert_called_once_with(
+            "11111111-1111-1111-1111-111111111111",
+            {"app_metadata": {"role": "recruiter"}},
+        )
+        self.assertEqual(response.get_json()["user"]["role"], "recruiter")
+
+    def test_recruiter_registration_requires_company_name(self):
+        response = self.client.post(
+            "/api/auth/register",
+            json={
+                "email": "recruiter@example.com",
+                "password": "StrongPass123",
+                "role": "recruiter",
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.supabase.auth.sign_up.assert_not_called()
+
+    def test_registration_rejects_unknown_role(self):
+        response = self.client.post(
+            "/api/auth/register",
+            json={
+                "email": "user@example.com",
+                "password": "StrongPass123",
+                "role": "admin",
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.supabase.auth.sign_up.assert_not_called()
+
     def test_registration_with_email_confirmation(self):
         self.supabase.auth.sign_up.return_value = auth_response(with_session=False)
 
@@ -113,7 +170,10 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
 
     def test_login_success(self):
-        self.supabase.auth.sign_in_with_password.return_value = auth_response()
+        self.supabase.auth.sign_in_with_password.return_value = auth_response(
+            app_metadata={"role": "recruiter"},
+            user_metadata={"company_name": "Northwind Labs"},
+        )
 
         response = self.client.post(
             "/api/auth/login",

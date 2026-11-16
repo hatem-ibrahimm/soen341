@@ -6,6 +6,9 @@ import { getToken, saveSession } from './session.js'
 // v3: Sprint 3 added more sample jobs/applications for the analytics dashboard.
 const KEY = 'cc_mock_db_v3'
 const DEMO_USER_ID = '00000000-0000-4000-8000-000000000001'
+const MOCK_RESUME_URL =
+    'data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA2MTIgNzkyXSAvUmVzb3VyY2VzIDw8IC9Gb250IDw8IC9GMSA0IDAgUiA+PiA+PiAvQ29udGVudHMgNSAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+CmVuZG9iago1IDAgb2JqCjw8IC9MZW5ndGggNjAgPj4Kc3RyZWFtCkJUIC9GMSAxOCBUZiA1MCA3MDAgVGQgKE1heWEgVHJlbWJsYXkgLSBTYW1wbGUgUmVzdW1lKSBUaiBFVAplbmRzdHJlYW0KZW5kb2JqCnhyZWYKMCA2CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDU4IDAwMDAwIG4gCjAwMDAwMDAxMTUgMDAwMDAgbiAKMDAwMDAwMDI0MSAwMDAwMCBuIAowMDAwMDAwMzExIDAwMDAwIG4gCnRyYWlsZXIKPDwgL1NpemUgNiAvUm9vdCAxIDAgUiA+PgpzdGFydHhyZWYKNDIxCiUlRU9GCg=='
+const MOCK_RESUME_IDS = new Set(['res-1', 'res-2'])
 
 const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString()
 
@@ -180,6 +183,8 @@ export const MOCK_JOBS = [
     },
 ]
 
+const MOCK_JOB_IDS = new Set(MOCK_JOBS.map((job) => String(job.id)))
+
 function history(...steps) {
     return steps.map(([status, d]) => ({ status, changed_at: daysAgo(d) }))
 }
@@ -243,7 +248,7 @@ function seed() {
                 file_size: 184320,
                 uploaded_at: daysAgo(14),
                 is_default: true,
-                file_url: '',
+                file_url: MOCK_RESUME_URL,
             },
             {
                 id: 'res-2',
@@ -251,7 +256,7 @@ function seed() {
                 file_size: 221184,
                 uploaded_at: daysAgo(30),
                 is_default: false,
-                file_url: '',
+                file_url: MOCK_RESUME_URL,
             },
         ],
         applications: [
@@ -294,7 +299,33 @@ function seed() {
             app('c1a2e3f4-1111-4a6d-9c01-0a0000000111', 'job-111', 'Rejected', ['Applied', 41], ['Rejected', 30]),
             app('c1a2e3f4-1111-4a6d-9c01-0a0000000114', 'job-114', 'Rejected', ['Applied', 52], ['Under Review', 49], ['Rejected', 45]),
         ],
+        jobs: MOCK_JOBS.map((job) => ({
+            ...job,
+            recruiter_id: DEMO_USER_ID,
+        })),
     }
+}
+
+function addDemoRecruiterOwnership(db) {
+    if (db.profile?.id !== DEMO_USER_ID) return db
+
+    let changed = false
+    db.jobs = (db.jobs ?? MOCK_JOBS).map((job) => {
+        if (MOCK_JOB_IDS.has(String(job.id)) && !job.recruiter_id) {
+            changed = true
+            return { ...job, recruiter_id: DEMO_USER_ID }
+        }
+        return job
+    })
+    db.resumes = (db.resumes ?? []).map((resume) => {
+        if (MOCK_RESUME_IDS.has(String(resume.id)) && !resume.file_url) {
+            changed = true
+            return { ...resume, file_url: MOCK_RESUME_URL }
+        }
+        return resume
+    })
+    if (changed) writeDb(db)
+    return db
 }
 
 let memoryDb = null // used when localStorage is unavailable
@@ -302,7 +333,7 @@ let memoryDb = null // used when localStorage is unavailable
 export function readDb() {
     try {
         const raw = window.localStorage.getItem(KEY)
-        if (raw) return JSON.parse(raw)
+        if (raw) return addDemoRecruiterOwnership(JSON.parse(raw))
     } catch {
         /* fall through */
     }
@@ -326,7 +357,9 @@ export function resetDb() {
 }
 
 export function ensureDemoSession() {
-    if (!getToken()) saveSession('mock-token', DEMO_USER_ID)
+    if (!getToken() || getToken() === 'mock-token') {
+        saveSession('mock-token', DEMO_USER_ID, 'recruiter', 'Northwind Labs')
+    }
 }
 
 export const newId = (prefix) =>

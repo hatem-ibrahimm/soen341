@@ -100,6 +100,8 @@ export function register(user) {
             password: user.password,
             first_name: user.firstName,
             last_name: user.lastName,
+            role: user.role,
+            company_name: user.companyName,
         },
     })
 }

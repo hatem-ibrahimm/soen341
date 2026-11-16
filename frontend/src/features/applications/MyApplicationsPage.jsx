@@ -11,6 +11,8 @@ import styles from './Applications.module.css'
 export default function MyApplicationsPage() {
     const [apps, setApps] = useState(null)
     const [error, setError] = useState('')
+    const [loading, setLoading] = useState(true)
+    const [retryCount, setRetryCount] = useState(0)
     const [filter, setFilter] = useState('All')
     const [query, setQuery] = useState('')
     const [params] = useSearchParams()
@@ -18,8 +20,29 @@ export default function MyApplicationsPage() {
     const { resumes } = useResumes()
 
     useEffect(() => {
-        listMyApplications().then(setApps).catch((e) => setError(e.message))
-    }, [])
+        let active = true
+        listMyApplications()
+            .then((items) => {
+                if (active) setApps(items)
+            })
+            .catch((requestError) => {
+                if (active) setError(requestError.message || 'Unable to load applications.')
+            })
+            .finally(() => {
+                if (active) setLoading(false)
+            })
+
+        return () => {
+            active = false
+        }
+    }, [retryCount])
+
+    function retry() {
+        setApps(null)
+        setError('')
+        setLoading(true)
+        setRetryCount((count) => count + 1)
+    }
 
     useEffect(() => {
         if (apps && highlight) document.getElementById(`app-${highlight}`)?.scrollIntoView({ block: 'center' })
@@ -52,8 +75,6 @@ export default function MyApplicationsPage() {
                 <Link to="/jobs" className={styles.primaryLink}>Find more jobs</Link>
             </div>
 
-            {error && <Alert tone="error">{error}</Alert>}
-
             <div className={styles.statRow} role="tablist" aria-label="Filter by status">
                 {['All', ...APPLICATION_STATUSES].map((s) => (
                     <button
@@ -79,8 +100,13 @@ export default function MyApplicationsPage() {
                         aria-label="Search applications"
                     />
                 </div>
-                {apps === null ? (
-                    <p className={styles.muted} style={{ padding: 20 }}>Loading applications…</p>
+                {apps === null && loading ? (
+                    <p className={styles.muted} style={{ padding: 20 }} role="status">Loading applications…</p>
+                ) : apps === null ? (
+                    <div style={{ padding: 20 }}>
+                        <Alert tone="error">{error || 'Unable to load applications.'}</Alert>
+                        <button type="button" onClick={retry}>Retry</button>
+                    </div>
                 ) : visible.length === 0 ? (
                     <div style={{ padding: 20 }}>
                         <EmptyState

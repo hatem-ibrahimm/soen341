@@ -75,11 +75,19 @@ def _serialize_application(row, *, details=False):
     }
     if details:
         data["cover_letter"] = row[10]
+        data["applicant"].update({
+            "title": row[11],
+            "phone_number": row[12],
+            "location": row[13],
+            "bio": row[14],
+        })
     return data
 
 
-def register_recruiter_applicant_routes(app, get_connection, get_current_user):
-    """Register read-only recruiter applicant endpoints on an existing app."""
+def register_recruiter_applicant_routes(
+    app, get_connection, get_current_user, get_resume_download_url
+):
+    """Register recruiter applicant review endpoints scoped to posting ownership."""
 
     def authorize():
         user = get_current_user()
@@ -179,7 +187,8 @@ def register_recruiter_applicant_routes(app, get_connection, get_current_user):
                 """
                 SELECT a.id, a.applicant_id, a.job_id, a.resume_id,
                        a.status, a.created_at, p.first_name, p.last_name,
-                       p.email, r.file_name, a.cover_letter
+                       p.email, r.file_name, a.cover_letter, p.title,
+                       p.phone_number, p.location, p.bio
                 FROM public.applications AS a
                 JOIN public.jobs AS j ON j.id = a.job_id
                 LEFT JOIN public.profiles AS p ON p.id = a.applicant_id
@@ -197,6 +206,51 @@ def register_recruiter_applicant_routes(app, get_connection, get_current_user):
         except Exception:
             app.logger.exception("Recruiter application retrieval failed")
             return jsonify({"error": "Unable to retrieve application."}), 500
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
+    @app.get("/api/recruiter/applications/<application_id>/resume")
+    def recruiter_get_application_resume(application_id):
+        recruiter_id, error = authorize()
+        if error:
+            return error
+        if not _valid_uuid(application_id):
+            return jsonify({"error": "Invalid application ID."}), 400
+
+        conn = cursor = None
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT r.file_name, r.storage_path
+                FROM public.applications AS a
+                JOIN public.jobs AS j ON j.id = a.job_id
+                JOIN public.resumes AS r ON r.id = a.resume_id
+                WHERE a.id = %s AND j.recruiter_id = %s
+                """,
+                (application_id, recruiter_id),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                return jsonify({"error": "Application or resume not found."}), 404
+
+            download_url = get_resume_download_url(row[1])
+            if not download_url:
+                app.logger.error("Resume download URL could not be generated")
+                return jsonify({"error": "Unable to generate resume download link."}), 500
+            return jsonify({
+                "resume": {
+                    "file_name": row[0],
+                    "download_url": download_url,
+                },
+            }), 200
+        except Exception:
+            app.logger.exception("Recruiter resume retrieval failed")
+            return jsonify({"error": "Unable to retrieve application resume."}), 500
         finally:
             if cursor is not None:
                 cursor.close()

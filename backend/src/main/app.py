@@ -1047,4 +1047,488 @@ def create_app(test_config=None):
 
             storage.upload(
                 new_storage_path,
-          
+          upload["file_bytes"],
+                file_options={
+                    "content-type": upload["content_type"],
+                    "upsert": "false",
+                },
+            )
+
+            if existing_row:
+                old_resume = resume_to_dict(existing_row)
+
+                cursor.execute(
+                    """
+                    UPDATE resumes
+                    SET file_name = %s,
+                        storage_path = %s,
+                        content_type = %s,
+                        file_size = %s,
+                        uploaded_at = CURRENT_TIMESTAMP
+                    WHERE profile_id = %s
+                    RETURNING id, profile_id, file_name, storage_path,
+                              content_type, file_size, uploaded_at
+                    """,
+                    (
+                        upload["file_name"],
+                        new_storage_path,
+                        upload["content_type"],
+                        upload["file_size"],
+                        profile_id,
+                    ),
+                )
+            else:
+                old_resume = None
+
+                cursor.execute(
+                    """
+                    INSERT INTO resumes (
+                        profile_id, file_name, storage_path,
+                        content_type, file_size, uploaded_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                    RETURNING id, profile_id, file_name, storage_path,
+                              content_type, file_size, uploaded_at
+                    """,
+                    (
+                        profile_id,
+                        upload["file_name"],
+                        new_storage_path,
+                        upload["content_type"],
+                        upload["file_size"],
+                    ),
+                )
+
+            saved_row = cursor.fetchone()
+            connection.commit()
+
+           
+            if old_resume:
+                try:
+                    storage.remove([old_resume["storage_path"]])
+                except Exception:
+                    
+                    pass
+
+            return jsonify({
+                "message": (
+                    "Resume replaced successfully."
+                    if old_resume
+                    else "Resume uploaded successfully."
+                ),
+                "resume": resume_to_dict(saved_row),
+            }), 200 if old_resume else 201
+
+        except Exception:
+            if connection is not None:
+                connection.rollback()
+
+            
+            if new_storage_path:
+                try:
+                    get_resume_storage().remove([new_storage_path])
+                except Exception:
+                    pass
+
+            return jsonify({"error": "Unable to save resume."}), 500
+
+        finally:
+            if connection is not None:
+                connection.close()
+
+    @app.route(
+        "/api/profiles/<profile_id>/resume",
+        methods=["POST"],
+    )
+    def create_resume(profile_id):
+        return upload_resume(profile_id)
+
+    @app.route(
+        "/api/profiles/<profile_id>/resume",
+        methods=["PUT"],
+    )
+    def replace_resume(profile_id):
+        return upload_resume(profile_id, replace_existing=True)
+
+    @app.route(
+        "/api/profiles/<profile_id>/resume",
+        methods=["GET"],
+    )
+    def get_resume(profile_id):
+        _, access_error = check_resume_access(profile_id)
+
+        if access_error:
+            return access_error
+
+        connection = None
+
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                SELECT id, profile_id, file_name, storage_path,
+                       content_type, file_size, uploaded_at
+                FROM resumes
+                WHERE profile_id = %s
+                """,
+                (profile_id,),
+            )
+            row = cursor.fetchone()
+
+            if row is None:
+                return jsonify({"error": "Resume not found."}), 404
+
+            resume = resume_to_dict(row)
+
+            result = get_resume_storage().create_signed_url(
+                resume["storage_path"],
+                app.config["RESUME_SIGNED_URL_SECONDS"],
+            )
+
+            # Supabase SDK versions may use either key spelling.
+            signed_url = (
+                result.get("signedURL")
+                or result.get("signedUrl")
+            )
+
+            if not signed_url:
+                return jsonify({
+                    "error": "Unable to generate resume download link."
+                }), 500
+
+            resume["download_url"] = signed_url
+
+            return jsonify({"resume": resume}), 200
+
+        except Exception:
+            return jsonify({"error": "Unable to retrieve resume."}), 500
+
+        finally:
+            if connection is not None:
+                connection.close()
+
+    @app.route(
+        "/api/profiles/<profile_id>/resume",
+        methods=["DELETE"],
+    )
+    def delete_resume(profile_id):
+        _, access_error = check_resume_access(profile_id)
+
+        if access_error:
+            return access_error
+
+        connection = None
+
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                SELECT storage_path
+                FROM resumes
+                WHERE profile_id = %s
+                """,
+                (profile_id,),
+            )
+            row = cursor.fetchone()
+
+            if row is None:
+                return jsonify({"error": "Resume not found."}), 404
+
+            storage_path = row[0]
+
+            # Remove the file before deleting its database record.
+            get_resume_storage().remove([storage_path])
+
+            cursor.execute(
+                "DELETE FROM resumes WHERE profile_id = %s",
+                (profile_id,),
+            )
+            connection.commit()
+
+            return jsonify({
+                "message": "Resume deleted successfully."
+            }), 200
+
+        except Exception:
+            if connection is not None:
+                connection.rollback()
+
+            return jsonify({"error": "Unable to delete resume."}), 500
+
+        finally:
+            if connection is not None:
+                connection.close()
+
+
+    # -------------------------
+    # Job Search and Listings
+    # -------------------------
+
+    @app.get("/api/jobs")
+    def get_jobs():
+        connection = None
+        cursor = None
+
+        try:
+            # Read optional search filters.
+            keyword = request.args.get("keyword", "").strip()
+            location = request.args.get("location", "").strip()
+            category = request.args.get("category", "").strip()
+
+            # Read optional salary filters.
+            min_salary = request.args.get("min_salary")
+            max_salary = request.args.get("max_salary")
+
+            try:
+                min_salary = (
+                    float(min_salary) if min_salary else None
+                )
+                max_salary = (
+                    float(max_salary) if max_salary else None
+                )
+
+                # Salary values must be finite and non-negative.
+                import math
+
+                if (
+                    (min_salary is not None and
+                     (not math.isfinite(min_salary) or min_salary < 0))
+                    or
+                    (max_salary is not None and
+                     (not math.isfinite(max_salary) or max_salary < 0))
+                ):
+                    raise ValueError
+
+            except ValueError:
+                return jsonify({
+                    "error": "Salary filters must be valid, non-negative numbers."
+                }), 400
+
+            if (
+                min_salary is not None
+                and max_salary is not None
+                and min_salary > max_salary
+            ):
+                return jsonify({
+                    "error": "Minimum salary cannot exceed maximum salary."
+                }), 400
+
+            # Retrieve published jobs.
+            query = """
+                SELECT id, title, company_name, location,
+                       category, description, min_salary,
+                       max_salary, created_at
+                FROM public.jobs
+                WHERE status = 'published'
+            """
+            params = []
+
+            # Search across the main job fields.
+            if keyword:
+                query += """
+                    AND (
+                        title ILIKE %s
+                        OR company_name ILIKE %s
+                        OR description ILIKE %s
+                        OR location ILIKE %s
+                        OR category ILIKE %s
+                    )
+                """
+                search_term = f"%{keyword}%"
+                params.extend([search_term] * 5)
+
+            # Optional location filter.
+            if location:
+                query += " AND location ILIKE %s"
+                params.append(f"%{location}%")
+
+            # Optional category filter.
+            if category:
+                query += " AND category ILIKE %s"
+                params.append(f"%{category}%")
+
+            # Include jobs whose salary ranges overlap the
+            # requested range. NULL means the bound is unspecified.
+            if min_salary is not None:
+                query += """
+                    AND (max_salary IS NULL OR max_salary >= %s)
+                """
+                params.append(min_salary)
+
+            if max_salary is not None:
+                query += """
+                    AND (min_salary IS NULL OR min_salary <= %s)
+                """
+                params.append(max_salary)
+
+            query += " ORDER BY created_at DESC"
+
+            connection = get_connection()
+            cursor = connection.cursor()
+            cursor.execute(query, tuple(params))
+
+            columns = [column[0] for column in cursor.description]
+            jobs = [
+                dict(zip(columns, row))
+                for row in cursor.fetchall()
+            ]
+
+            # Convert salary values to JSON-friendly numbers.
+            for job in jobs:
+                if job["min_salary"] is not None:
+                    job["min_salary"] = float(job["min_salary"])
+                if job["max_salary"] is not None:
+                    job["max_salary"] = float(job["max_salary"])
+
+            return jsonify({"jobs": jobs}), 200
+
+        except Exception:
+            app.logger.exception("Job listing retrieval failed")
+            return jsonify({
+                "error": "Unable to retrieve jobs at this time."
+            }), 500
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+
+            if connection is not None:
+                connection.close()
+
+    @app.get("/api/jobs/<int:job_id>")
+    def get_job_details(job_id):
+        connection = None
+        cursor = None
+
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                SELECT id, title, company_name, location,
+                       category, description, min_salary,
+                       max_salary, created_at
+                FROM public.jobs
+                WHERE id = %s AND status = 'published'
+                """,
+                (job_id,)
+            )
+
+            row = cursor.fetchone()
+
+            if row is None:
+                return jsonify({
+                    "error": "Job not found."
+                }), 404
+
+            columns = [column[0] for column in cursor.description]
+            job = dict(zip(columns, row))
+
+            # Convert salary values to JSON-friendly numbers.
+            if job["min_salary"] is not None:
+                job["min_salary"] = float(job["min_salary"])
+            if job["max_salary"] is not None:
+                job["max_salary"] = float(job["max_salary"])
+
+            return jsonify({"job": job}), 200
+
+        except Exception:
+            app.logger.exception("Job details retrieval failed")
+            return jsonify({
+                "error": "Unable to retrieve job details at this time."
+            }), 500
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+
+            if connection is not None:
+                connection.close()
+
+  
+    if __package__:
+        from .application_submission import register_application_submission_routes
+    else:
+        from application_submission import register_application_submission_routes
+
+    register_application_submission_routes(
+        app, get_connection, get_current_user
+    )
+
+
+    if __package__:
+        from .application_tracking import register_application_tracking_routes
+    else:
+        from application_tracking import register_application_tracking_routes
+
+    register_application_tracking_routes(
+        app, get_connection, get_current_user
+    )
+
+
+    if __package__:
+        from .recruiter_postings import register_recruiter_posting_routes
+    else:
+        from recruiter_postings import register_recruiter_posting_routes
+
+    register_recruiter_posting_routes(
+        app, get_connection, get_current_user
+    )
+
+
+    if __package__:
+        from .notifications import register_notification_routes
+    else:
+        from notifications import register_notification_routes
+
+    register_notification_routes(
+        app, get_connection, get_current_user
+    )
+
+    # Sprint 3: recruiter applicant management (read-only, scoped to owner).
+    if __package__:
+        from .recruiter_applicants import register_recruiter_applicant_routes
+    else:
+        from recruiter_applicants import register_recruiter_applicant_routes
+
+    register_recruiter_applicant_routes(
+        app, get_connection, get_current_user, get_resume_download_url
+    )
+
+    # Sprint 3 Issue #79: job seeker application analytics.
+    if __package__:
+        from .application_analytics import register_application_analytics_routes
+    else:
+        from application_analytics import register_application_analytics_routes
+
+    register_application_analytics_routes(
+        app, get_connection, get_current_user
+    )
+
+    # Sprint 3 Issue #80: application history and activity metrics.
+    if __package__:
+        from .application_history import register_application_history_routes
+    else:
+        from application_history import register_application_history_routes
+
+    register_application_history_routes(
+        app, get_connection, get_current_user
+    )
+
+    return app
+
+
+app = create_app()
+
+
+if __name__ == "__main__":
+    app.run(
+        host=os.getenv("HOST", "127.0.0.1"),
+        port=int(os.getenv("PORT", "5000")),
+        debug=os.getenv("FLASK_DEBUG", "0") == "1",
+    )

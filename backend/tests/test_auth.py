@@ -98,17 +98,23 @@ class AuthApiTests(unittest.TestCase):
         )
         self.assertEqual(response.get_json()["user"]["role"], "recruiter")
 
-    def test_recruiter_registration_requires_company_name(self):
+    def test_recruiter_registration_allows_blank_company_name(self):
+        self.supabase.auth.sign_up.return_value = auth_response()
+
         response = self.client.post(
             "/api/auth/register",
             json={
                 "email": "recruiter@example.com",
                 "password": "StrongPass123",
                 "role": "recruiter",
+                "company_name": "   ",
             },
         )
-        self.assertEqual(response.status_code, 400)
-        self.supabase.auth.sign_up.assert_not_called()
+
+        self.assertEqual(response.status_code, 201)
+
+        data = self.supabase.auth.sign_up.call_args.args[0]["options"]["data"]
+        self.assertEqual(data["company_name"], "")
 
     def test_registration_rejects_unknown_role(self):
         response = self.client.post(

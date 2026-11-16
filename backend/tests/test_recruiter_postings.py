@@ -1,7 +1,4 @@
-"""Mocked backend tests for Issue #43 recruiter job posting APIs.
 
-These do not prove the deployed jobs table matches the documented schema.
-"""
 
 import unittest
 from datetime import date, datetime, timezone
@@ -72,15 +69,35 @@ class RecruiterPostingTests(unittest.TestCase):
 
     def test_non_recruiters_cannot_create_postings(self):
         self.recruiter_metadata = {"role": "job_seeker"}
+        self.cursor.fetchone.return_value = None
+
         response = self.post()
+
         self.assertEqual(response.status_code, 403)
-        self.connection.cursor.assert_not_called()
+        sql, params = self.cursor.execute.call_args.args
+        self.assertIn("public.recruiters", sql)
+        self.assertEqual(params, (RECRUITER_ID,))
+        self.assertEqual(self.cursor.execute.call_count, 1)
 
     def test_user_metadata_is_not_trusted_for_recruiter_access(self):
         self.recruiter_metadata = {}
-        response = self.post({**self.valid, "role": "recruiter"})
+
+        self.supabase.auth.get_user.side_effect = lambda _token: SimpleNamespace(
+            user=SimpleNamespace(
+                id=RECRUITER_ID,
+                app_metadata={},
+                user_metadata={"role": "recruiter"},
+            )
+        )
+
+        self.cursor.fetchone.return_value = None
+
+        response = self.post()
+
         self.assertEqual(response.status_code, 403)
-        self.connection.cursor.assert_not_called()
+        sql, params = self.cursor.execute.call_args.args
+        self.assertIn("public.recruiters", sql)
+        self.assertEqual(params, (RECRUITER_ID,))
 
     def test_role_list_from_admin_metadata_is_allowed(self):
         self.recruiter_metadata = {"roles": ["job_seeker", "recruiter"]}
@@ -229,9 +246,19 @@ class RecruiterPostingTests(unittest.TestCase):
 
     def test_update_requires_recruiter_auth(self):
         self.recruiter_metadata = {"role": "job_seeker"}
-        response = self.client.patch("/api/recruiter/jobs/42", json={"status": "published"}, headers=self.headers)
+        self.cursor.fetchone.return_value = None
+
+        response = self.client.patch(
+            "/api/recruiter/jobs/42",
+            json={"status": "published"},
+            headers=self.headers,
+        )
+
         self.assertEqual(response.status_code, 403)
-        self.connection.cursor.assert_not_called()
+        sql, params = self.cursor.execute.call_args.args
+        self.assertIn("public.recruiters", sql)
+        self.assertEqual(params, (RECRUITER_ID,))
+        self.assertEqual(self.cursor.execute.call_count, 1)
 
     def test_update_rolls_back_on_db_error(self):
         self.cursor.execute.side_effect = RuntimeError("database down")

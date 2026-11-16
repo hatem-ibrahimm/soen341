@@ -84,6 +84,21 @@ def create_app(test_config=None):
             app.config["SUPABASE_KEY"],
         )
 
+    def get_supabase_admin():
+        factory = app.config.get("SUPABASE_ADMIN_CLIENT_FACTORY")
+        if factory:
+            return factory()
+        factory = app.config.get("SUPABASE_CLIENT_FACTORY")
+        if factory:
+            return factory()
+
+        service_key = app.config.get("SUPABASE_SERVICE_KEY")
+        if not app.config["SUPABASE_URL"] or not service_key:
+            raise RuntimeError(
+                "SUPABASE_URL and SUPABASE_SERVICE_KEY must be configured."
+            )
+        return create_client(app.config["SUPABASE_URL"], service_key)
+
     def get_storage_supabase():
         factory = app.config.get("SUPABASE_CLIENT_FACTORY")
 
@@ -137,6 +152,19 @@ def create_app(test_config=None):
         except Exception:
             return None
 
+    def get_account_role(user):
+        """Determine account role from trusted metadata or recruiter membership.
+
+        Editable user_metadata is not itself proof of recruiter access. The
+        database trigger on account creation is responsible for inserting
+        a recruiter row when a user chooses the recruiter sign-up path.
+        """
+        if __package__:
+            from .recruiter_postings import _recruiter_id
+        else:
+            from recruiter_postings import _recruiter_id
+        return "recruiter" if _recruiter_id(user, get_connection) else "job_seeker"
+
     def check_profile_access(profile_id):
         """
         Make sure the logged-in user is asking for their OWN profile.
@@ -185,6 +213,18 @@ def create_app(test_config=None):
         password = str(payload.get("password", ""))
         first_name = str(payload.get("first_name", "")).strip()
         last_name = str(payload.get("last_name", "")).strip()
+        role = payload.get("role", "job_seeker")
+        if not isinstance(role, str) or role not in {"job_seeker", "recruiter"}:
+            return jsonify({"error": "role must be job_seeker or recruiter."}), 400
+
+        raw_company = payload.get("company_name", "")
+        if raw_company is not None and not isinstance(raw_company, str):
+            return jsonify({"error": "company_name must be text."}), 400
+        company_name = (raw_company or "").strip()
+        if len(company_name) > 160:
+            return jsonify({"error": "company_name must be 160 characters or fewer."}), 400
+        if role != "recruiter" and company_name:
+            return jsonify({"error": "company_name is only allowed for recruiters."}), 400
 
         # The registration form may send one "name" field instead,
         # e.g. "Ace Newton" -> first_name "Ace", last_name "Newton"
@@ -211,22 +251,36 @@ def create_app(test_config=None):
                 }
             ), 400
 
+        admin_supabase = None
+        if role == "recruiter":
+            try:
+                admin_supabase = get_supabase_admin()
+            except Exception:
+                app.logger.exception("Recruiter registration is not configured.")
+                return jsonify({
+                    "error": "Recruiter registration is currently unavailable."
+                }), 503
+
         try:
             supabase = get_supabase()
 
             # "data" is saved as user metadata. The database trigger
             # (handle_new_user) copies first_name and last_name from it
             # into the new row in the profiles table.
+            # The database's on_auth_recruiter_created trigger checks the
+            # role at INSERT time; editing user_metadata later grants no role.
+            signup_data = {
+                "first_name": first_name,
+                "last_name": last_name,
+                "role": role,
+            }
+            if role == "recruiter":
+                signup_data["company_name"] = company_name
             response = supabase.auth.sign_up(
                 {
                     "email": email,
                     "password": password,
-                    "options": {
-                        "data": {
-                            "first_name": first_name,
-                            "last_name": last_name,
-                        }
-                    },
+                    "options": {"data": signup_data},
                 }
             )
 
@@ -235,6 +289,24 @@ def create_app(test_config=None):
 
             if user is None:
                 return jsonify({"error": "Unable to create account."}), 400
+
+            if role == "recruiter":
+                try:
+                    admin_supabase.auth.admin.update_user_by_id(
+                        str(user.id),
+                        {"app_metadata": {"role": "recruiter"}},
+                    )
+                except Exception:
+                    app.logger.exception("Recruiter role provisioning failed.")
+                    try:
+                        admin_supabase.auth.admin.delete_user(str(user.id))
+                    except Exception:
+                        app.logger.exception(
+                            "Failed to clean up an unprovisioned recruiter account."
+                        )
+                    return jsonify({
+                        "error": "Unable to activate recruiter access. Please try again."
+                    }), 503
 
             body = {
                 "message": (
@@ -245,6 +317,8 @@ def create_app(test_config=None):
                 "user": {
                     "id": str(user.id),
                     "email": user.email,
+                    "role": role,
+                    "company_name": company_name if role == "recruiter" else "",
                 },
                 "email_confirmation_required": session is None,
             }
@@ -306,12 +380,21 @@ def create_app(test_config=None):
             if user is None or session is None:
                 return jsonify({"error": "Invalid email or password."}), 401
 
+            # Resolve the role from authoritative server-side sources before
+            # returning it to the frontend. Never trust a login payload role.
+            try:
+                role = get_account_role(user)
+            except Exception:
+                app.logger.exception("Account role lookup failed during login")
+                return jsonify({"error": "Unable to determine account role."}), 503
+
             return jsonify(
                 {
                     "message": "Login successful.",
                     "user": {
                         "id": str(user.id),
                         "email": user.email,
+                        "role": role,
                     },
                     "session": {
                         "access_token": session.access_token,
@@ -345,11 +428,18 @@ def create_app(test_config=None):
         if user is None:
             return jsonify({"error": "Authentication required."}), 401
 
+        try:
+            role = get_account_role(user)
+        except Exception:
+            app.logger.exception("Account role lookup failed in /api/auth/me")
+            return jsonify({"error": "Unable to determine account role."}), 503
+
         return jsonify(
             {
                 "user": {
                     "id": str(user.id),
                     "email": user.email,
+                    "role": role,
                 }
             }
         ), 200
@@ -810,6 +900,14 @@ def create_app(test_config=None):
         """Return the configured Supabase Storage bucket."""
         return get_storage_supabase().storage.from_(app.config["RESUME_BUCKET"])
 
+    def get_resume_download_url(storage_path):
+        """Create a short-lived URL for an authorized recruiter review."""
+        result = get_resume_storage().create_signed_url(
+            storage_path,
+            app.config["RESUME_SIGNED_URL_SECONDS"],
+        )
+        return result.get("signedURL") or result.get("signedUrl")
+
     def check_resume_access(profile_id):
         """Allow only the authenticated owner to manage a resume."""
         if not is_valid_uuid(profile_id):
@@ -934,7 +1032,7 @@ def create_app(test_config=None):
 
             storage.upload(
                 new_storage_path,
-                upload["file_bytes"],
+          upload["file_bytes"],
                 file_options={
                     "content-type": upload["content_type"],
                     "upsert": "false",
@@ -1264,17 +1362,20 @@ def create_app(test_config=None):
                 for row in cursor.fetchall()
             ]
 
-            # Convert salary values to JSON-friendly numbers.
+            # Convert salary and deadline values to JSON-friendly formats.
             for job in jobs:
                 if job["min_salary"] is not None:
                     job["min_salary"] = float(job["min_salary"])
+
                 if job["max_salary"] is not None:
                     job["max_salary"] = float(job["max_salary"])
-                if job["application_deadline"] is not None:
-                    deadline = job["application_deadline"]
+
+                deadline = job["application_deadline"]
+                if deadline is not None:
                     job["application_deadline"] = (
                         deadline.isoformat()
-                        if hasattr(deadline, "isoformat") else str(deadline)
+                        if hasattr(deadline, "isoformat")
+                        else str(deadline)
                     )
 
             return jsonify({"jobs": jobs}), 200
@@ -1322,16 +1423,19 @@ def create_app(test_config=None):
             columns = [column[0] for column in cursor.description]
             job = dict(zip(columns, row))
 
-            # Convert salary values to JSON-friendly numbers.
+            # Convert salary and deadline values to JSON-friendly formats.
             if job["min_salary"] is not None:
                 job["min_salary"] = float(job["min_salary"])
+
             if job["max_salary"] is not None:
                 job["max_salary"] = float(job["max_salary"])
-            if job["application_deadline"] is not None:
-                deadline = job["application_deadline"]
+
+            deadline = job["application_deadline"]
+            if deadline is not None:
                 job["application_deadline"] = (
                     deadline.isoformat()
-                    if hasattr(deadline, "isoformat") else str(deadline)
+                    if hasattr(deadline, "isoformat")
+                    else str(deadline)
                 )
 
             return jsonify({"job": job}), 200
@@ -1396,7 +1500,7 @@ def create_app(test_config=None):
         from recruiter_applicants import register_recruiter_applicant_routes
 
     register_recruiter_applicant_routes(
-        app, get_connection, get_current_user
+        app, get_connection, get_current_user, get_resume_download_url
     )
 
     # Sprint 3 Issue #79: job seeker application analytics.

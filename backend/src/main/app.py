@@ -214,21 +214,6 @@ def create_app(test_config=None):
         first_name = str(payload.get("first_name", "")).strip()
         last_name = str(payload.get("last_name", "")).strip()
         role = payload.get("role", "job_seeker")
-        company_name = payload.get("company_name", "")
-
-        if role not in ("job_seeker", "recruiter"):
-            return jsonify({"error": "role must be job_seeker or recruiter."}), 400
-        if not isinstance(company_name, str):
-            return jsonify({"error": "company_name must be text."}), 400
-        company_name = company_name.strip()
-        if role == "recruiter" and (
-            not company_name or len(company_name) > 160
-        ):
-            return jsonify({
-                "error": "Recruiter accounts require a company name of 160 characters or fewer."
-            }), 400
-
-        role = payload.get("role", "job_seeker")
         if not isinstance(role, str) or role not in {"job_seeker", "recruiter"}:
             return jsonify({"error": "role must be job_seeker or recruiter."}), 400
 

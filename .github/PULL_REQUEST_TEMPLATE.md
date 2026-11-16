@@ -4,7 +4,7 @@ Closes #
 
 ## Summary
 
-# Describe what this pull request changes:
+Describe what this pull request changes:
 
 -
 -

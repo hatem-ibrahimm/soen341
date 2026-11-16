@@ -21,6 +21,13 @@
   .inner { gap: 8px; }
   .navLink { padding: 6px 8px; font-size: 0.85rem; }
 }
+/* Sprint 3: four links now, so let them scroll sideways on small screens */
+@media (max-width: 760px) {
+  .brand { font-size: 0.95rem; }
+  .nav { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .nav::-webkit-scrollbar { display: none; }
+  .navLink { white-space: nowrap; }
+}
 
 .demoBar {
   max-width: 1128px; margin: 0 auto; padding: 0 16px 32px;

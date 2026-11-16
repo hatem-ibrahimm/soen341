@@ -1377,6 +1377,16 @@ def create_app(test_config=None):
         app, get_connection, get_current_user
     )
 
+    # Sprint 3: recruiter applicant management (read-only, scoped to owner).
+    if __package__:
+        from .recruiter_applicants import register_recruiter_applicant_routes
+    else:
+        from recruiter_applicants import register_recruiter_applicant_routes
+
+    register_recruiter_applicant_routes(
+        app, get_connection, get_current_user
+    )
+
     return app
 
 

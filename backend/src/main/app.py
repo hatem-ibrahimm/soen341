@@ -914,12 +914,4 @@ def create_app(test_config=None):
             )
             existing_row = cursor.fetchone()
 
-            if existing_row and not replace_existing:
-                connection.rollback()
-                return jsonify({
-                    "error": "A resume already exists. Use PUT to replace it."
-                }), 409
-
-            if not existing_row and replace_existing:
-                connection.rollback()
-                return jsonify({"error": "Resume not found.
+            if existing_row and no

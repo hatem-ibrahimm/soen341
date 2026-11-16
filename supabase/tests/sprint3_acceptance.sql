@@ -232,8 +232,9 @@ BEGIN
     -- ---------------------------------------------------------------------
     BEGIN
       results := results || jsonb_build_object('feature', 'Recruiter accounts', 'test', 'AT-S3-R1',
-        'checks', 'signing up as a recruiter creates the recruiter record with the company name',
+        'checks', 'signing up as a recruiter creates the recruiter record with their name and company',
         'result', CASE WHEN (SELECT company_name FROM public.recruiters WHERE id = recruiter) = 'Northwind'
+                        AND (SELECT full_name FROM public.recruiters WHERE id = recruiter) = 'Rae Recruiter'
                        THEN 'PASS' ELSE 'FAIL' END);
 
       results := results || jsonb_build_object('feature', 'Recruiter accounts', 'test', 'AT-S3-R2',

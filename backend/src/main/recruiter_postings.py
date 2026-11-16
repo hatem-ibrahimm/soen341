@@ -34,25 +34,49 @@ def _uuid(value):
         return False
 
 
-def _recruiter_id(user):
-    """Trust only administrator-controlled Supabase app_metadata, not user_metadata.
+def _recruiter_id(user, get_connection=None):
+    """Return the authenticated recruiter ID, or None if not authorized.
 
-    The team must provision recruiters with app_metadata.role='recruiter'
-    (or app_metadata.roles containing 'recruiter') using a trusted admin flow.
+    The administrator-controlled Supabase app_metadata remains trusted for
+    legacy recruiters. New self-service recruiters are instead recognized by
+    the public.recruiters row inserted by the sign-up database trigger.
+
+    Never trust editable user_metadata on its own. The table lookup must use
+    the authenticated user ID, not an ID/role provided in request JSON.
+    Database failures propagate to callers to fail closed, not silently
+    misidentify a recruiter as a job seeker.
     """
     if user is None:
         return None
-    metadata = getattr(user, "app_metadata", None)
-    if not isinstance(metadata, dict):
-        return None
-    roles = metadata.get("roles", [])
-    has_role = metadata.get("role") == "recruiter" or (
-        isinstance(roles, (list, tuple)) and "recruiter" in roles
-    )
-    if not has_role:
-        return None
     user_id = str(getattr(user, "id", ""))
-    return user_id if _uuid(user_id) else None
+    if not _uuid(user_id):
+        return None
+
+    metadata = getattr(user, "app_metadata", None)
+    if isinstance(metadata, dict):
+        roles = metadata.get("roles", [])
+        if metadata.get("role") == "recruiter" or (
+            isinstance(roles, (list, tuple)) and "recruiter" in roles
+        ):
+            return user_id
+
+    if get_connection is None:
+        return None
+
+    connection = cursor = None
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+        cursor.execute(
+            "SELECT 1 FROM public.recruiters WHERE id = %s",
+            (user_id,),
+        )
+        return user_id if cursor.fetchone() is not None else None
+    finally:
+        if cursor is not None:
+            cursor.close()
+        if connection is not None:
+            connection.close()
 
 
 def _validated_salary(value, field):
@@ -164,7 +188,11 @@ def register_recruiter_posting_routes(app, get_connection, get_current_user):
         user = get_current_user()
         if user is None:
             return None, (jsonify({"error": "Authentication required."}), 401)
-        recruiter = _recruiter_id(user)
+        try:
+            recruiter = _recruiter_id(user, get_connection)
+        except Exception:
+            app.logger.exception("Recruiter role verification failed")
+            return None, (jsonify({"error": "Unable to verify recruiter access."}), 503)
         if recruiter is None:
             return None, (jsonify({"error": "Recruiter access required."}), 403)
         return recruiter, None

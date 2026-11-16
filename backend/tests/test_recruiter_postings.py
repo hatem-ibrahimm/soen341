@@ -72,15 +72,17 @@ class RecruiterPostingTests(unittest.TestCase):
 
     def test_non_recruiters_cannot_create_postings(self):
         self.recruiter_metadata = {"role": "job_seeker"}
+        self.cursor.fetchone.return_value = None
         response = self.post()
         self.assertEqual(response.status_code, 403)
-        self.connection.cursor.assert_not_called()
+        self.assertIn("public.recruiters", self.cursor.execute.call_args.args[0])
 
     def test_user_metadata_is_not_trusted_for_recruiter_access(self):
         self.recruiter_metadata = {}
+        self.cursor.fetchone.return_value = None
         response = self.post({**self.valid, "role": "recruiter"})
         self.assertEqual(response.status_code, 403)
-        self.connection.cursor.assert_not_called()
+        self.assertIn("public.recruiters", self.cursor.execute.call_args.args[0])
 
     def test_role_list_from_admin_metadata_is_allowed(self):
         self.recruiter_metadata = {"roles": ["job_seeker", "recruiter"]}
@@ -229,15 +231,35 @@ class RecruiterPostingTests(unittest.TestCase):
 
     def test_update_requires_recruiter_auth(self):
         self.recruiter_metadata = {"role": "job_seeker"}
+        self.cursor.fetchone.return_value = None
         response = self.client.patch("/api/recruiter/jobs/42", json={"status": "published"}, headers=self.headers)
         self.assertEqual(response.status_code, 403)
-        self.connection.cursor.assert_not_called()
+        self.assertIn("public.recruiters", self.cursor.execute.call_args.args[0])
 
     def test_update_rolls_back_on_db_error(self):
         self.cursor.execute.side_effect = RuntimeError("database down")
         response = self.client.patch("/api/recruiter/jobs/42", json={"title": "New"}, headers=self.headers)
         self.assertEqual(response.status_code, 500)
         self.connection.rollback.assert_called_once()
+        self.connection.close.assert_called_once()
+
+
+    def test_database_recruiter_row_grants_posting_access(self):
+        self.recruiter_metadata = {"role": "job_seeker"}
+        self.cursor.fetchone.side_effect = [(1,), posting_row()]
+        response = self.post()
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.get_json()["job"]["recruiter_id"], RECRUITER_ID)
+        self.assertIn("public.recruiters", self.cursor.execute.call_args_list[0].args[0])
+        self.assertIn("INSERT INTO public.jobs", self.cursor.execute.call_args_list[1].args[0])
+
+    def test_recruiter_role_lookup_database_failure_fails_closed(self):
+        self.recruiter_metadata = {}
+        self.cursor.execute.side_effect = RuntimeError("database offline")
+        response = self.post()
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.get_json()["error"], "Unable to verify recruiter access.")
+        self.cursor.close.assert_called_once()
         self.connection.close.assert_called_once()
 
 

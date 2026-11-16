@@ -93,7 +93,11 @@ def register_recruiter_applicant_routes(
         user = get_current_user()
         if user is None:
             return None, (jsonify({"error": "Authentication required."}), 401)
-        recruiter_id = _recruiter_id(user)
+        try:
+            recruiter_id = _recruiter_id(user, get_connection)
+        except Exception:
+            app.logger.exception("Recruiter role verification failed")
+            return None, (jsonify({"error": "Unable to verify recruiter access."}), 503)
         if recruiter_id is None:
             return None, (jsonify({"error": "Recruiter access required."}), 403)
         return recruiter_id, None

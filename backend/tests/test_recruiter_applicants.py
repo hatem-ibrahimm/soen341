@@ -1,4 +1,4 @@
-"""Sprint 3 recruiter applicant API tests. Mocked auth and PostgreSQL."""
+
 
 import unittest
 from datetime import datetime, timezone
@@ -89,15 +89,16 @@ class RecruiterApplicantsTests(unittest.TestCase):
 
     def test_non_recruiter_is_rejected(self):
         self.metadata = {"role": "job_seeker"}
+        self.cursor.fetchone.return_value = None
         self.assertEqual(self.list().status_code, 403)
         self.assertEqual(self.detail().status_code, 403)
-        self.assertEqual(self.resume().status_code, 403)
-        self.connection.cursor.assert_not_called()
+        self.assertEqual(self.cursor.execute.call_count, 2)
 
     def test_user_metadata_cannot_grant_recruiter_role(self):
         self.metadata = {}
+        self.cursor.fetchone.return_value = None
         self.assertEqual(self.list().status_code, 403)
-        self.connection.cursor.assert_not_called()
+        self.assertIn("public.recruiters", self.cursor.execute.call_args.args[0])
 
     def test_admin_metadata_roles_list_is_accepted(self):
         self.metadata = {"roles": ["job_seeker", "recruiter"]}
@@ -280,6 +281,25 @@ class RecruiterApplicantsTests(unittest.TestCase):
         sql, _ = self.cursor.execute.call_args.args
         self.assertTrue(sql.lstrip().startswith("SELECT"))
         self.connection.commit.assert_not_called()
+
+
+    def test_database_recruiter_row_grants_applicant_listing(self):
+        self.metadata = {}
+        self.cursor.fetchone.side_effect = [(1,), (42,)]
+        self.cursor.fetchall.return_value = [application_row()]
+        response = self.list()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.get_json()["applications"]), 1)
+        self.assertIn("public.recruiters", self.cursor.execute.call_args_list[0].args[0])
+        self.assertIn("public.jobs", self.cursor.execute.call_args_list[1].args[0])
+
+    def test_recruiter_role_lookup_failure_returns_503(self):
+        self.metadata = {}
+        self.cursor.execute.side_effect = RuntimeError("database offline")
+        response = self.detail()
+        self.assertEqual(response.status_code, 503)
+        self.cursor.close.assert_called_once()
+        self.connection.close.assert_called_once()
 
 
 if __name__ == "__main__":

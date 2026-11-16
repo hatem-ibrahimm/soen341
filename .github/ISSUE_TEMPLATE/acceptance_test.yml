@@ -1,0 +1,54 @@
+name: Acceptance test
+description: A scenario that proves a user story works.
+title: "S4 - AT00 - "
+labels: ["type: acceptance-test", "area: testing"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What this test verifies.
+    validations:
+      required: true
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Acceptance Scenario
+      value: |
+        **Given:**
+
+        **When:**
+
+        **Then:**
+        -
+        -
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Result
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation
+      description: How it is checked. Name the automated test if there is one.
+    validations:
+      required: true
+  - type: input
+    id: covers
+    attributes:
+      label: Covers
+      description: The user story this test belongs to.
+      placeholder: "#81"
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result
+      options: [Not run yet, Pass, Fail]
+    validations:
+      required: true

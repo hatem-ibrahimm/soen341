@@ -18,3 +18,14 @@ export const STATUS_TONE = {
     Offered: 'green',
     Rejected: 'red',
 }
+
+// Colours for charts (analytics dashboard). Same hue families as the badges
+// above, but one step brighter so thin bars stay readable. Checked with a
+// colour-blind simulator: every neighbouring pair stays distinguishable.
+export const STATUS_CHART_COLOR = {
+    Applied: '#3b6fd1',
+    'Under Review': '#b07d12',
+    Interview: '#8256cc',
+    Offered: '#23936a',
+    Rejected: '#d6452f',
+}

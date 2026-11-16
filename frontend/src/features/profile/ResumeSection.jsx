@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Alert, Button, Card, FilePicker, Modal } from '../../components/common'
 import useResumes from '../../hooks/useResumes.js'
 import { formatDate, formatFileSize } from '../../services/format.js'
@@ -86,6 +87,13 @@ export default function ResumeSection() {
                         </li>
                     ))}
                 </ul>
+            )}
+
+            {/* Sprint 3: AI resume feedback lives on its own page */}
+            {!loading && resumes.length > 0 && (
+                <p className={styles.sectionHint}>
+                    <Link to="/resume-feedback">Get AI feedback on your resume →</Link>
+                </p>
             )}
 
             {(MULTIPLE_RESUMES || resumes.length === 0) && <FilePicker

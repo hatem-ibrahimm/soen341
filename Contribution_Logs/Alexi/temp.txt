@@ -1,12 +1,23 @@
+Contributor: Alexi  
+Sprint: 3
+Related issues: #82, #83, #103, #104  
+Total time:18 hours
+
+Recruiter pages and applicant review | Implemented recruiter dashboard pages with applicant lists, status filtering, date sorting, profile and resume access, and application-status updates. | 3 hrs | [Recruiter dashboard commits or PR link — #83] |
+Job creation and management | Completed frontend forms and dashboard interfaces for creating and managing job postings. | 8 hrs | [Job creation/management commits or PR link — #82] |
+Job notifications | Implemented the notification inbox, unread-count indicator, application links, and mark-as-read controls. | 3 hrs | [Notification commits or PR link — #103] |
+Recruiter registration and routing | Added job-seeker/recruiter role selection, the recruiter company-name field, and recruiter-dashboard routing after login. | 4hrs | [Registration/routing commits or PR link — #104] |
+*18 hrs total*
+
 Contributor: Alexi
 Sprint: 2
 Related issues: #3, #4, #5, #8, #9
 Total time: 20 hours
 
 Contribution area	Work completed	Time	Evidence / links
-Authentication and profile fixes	Corrected login form variable handling and registration validation messages. Retained shared frontend password-policy validation for Sprint 2. Updated profile loading to use the API service and clarified that only personal information is persisted.	4 hours	[Authentication/profile commits or PR link]
-Job API prototype and filtering	Implemented a consistent fictional jobs dataset in jobApi.js. Added keyword, location, category, and combined salary filtering, salary-input validation, and undisclosed-salary handling.	4 hours	[Job service commits or PR link]
-Job listings, cards, and details	Implemented job listings, cards, and detail views. Added loading, error, empty-result, and unavailable-job states. Clearly identified prototype data and unavailable application submission.	4 hours	[Job components commits or PR link]
-Navigation and integration	Connected /jobs and /jobs/:jobId, added homepage job navigation, and preserved search parameters through details and sign-in navigation. Removed the incomplete recruiter-dashboard route/import that prevented the frontend from building.	4 hours	[Routing/navigation commits or PR link]
-Validation review and delivery documentation	Reviewed the reported production-build, job API check, and lint results. Prepared the pull request description, documented implementation boundaries and follow-up work, and recorded AI assistance. Manual acceptance and regression testing remain pending.	4 hours	[PR, check output, and documentation links]
+Authentication and profile fixes	Corrected login form variable handling and registration validation messages. Retained shared frontend password-policy validation for Sprint 2. Updated profile loading to use the API service and clarified that only personal information is persisted.	4 hours	
+Job API prototype and filtering	Implemented a consistent fictional jobs dataset in jobApi.js. Added keyword, location, category, and combined salary filtering, salary-input validation, and undisclosed-salary handling.	4 hours	
+Job listings, cards, and details	Implemented job listings, cards, and detail views. Added loading, error, empty-result, and unavailable-job states. Clearly identified prototype data and unavailable application submission.	4 hours	
+Navigation and integration	Connected /jobs and /jobs/:jobId, added homepage job navigation, and preserved search parameters through details and sign-in navigation. Removed the incomplete recruiter-dashboard route/import that prevented the frontend from building.	4 hours	
+Validation review and delivery documentation	Reviewed the reported production-build, job API check, and lint results. Prepared the pull request description, documented implementation boundaries and follow-up work, and recorded AI assistance. Manual acceptance and regression testing remain pending.	4 hours
 Total		20 hours	

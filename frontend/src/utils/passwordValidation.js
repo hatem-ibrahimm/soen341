@@ -1,20 +1,18 @@
 export const PASSWORD_REQUIREMENTS =
-    'Only letters and numbers, Must include at least 1 number, Must be shorter than 10 characters.';
+    'Use at least 8 characters and include at least one letter and one number.';
 
 export function validatePassword(password) {
-    if (typeof password !== 'string' || password.length === 0 ) {
+    if (typeof password !== 'string' || password.length === 0) {
         return 'Enter a password';
     }
-    if (!/^[A-Za-z0-9]+$/.test(password)) {
-        return 'Your password can contain only letters and numbers. No spaces or special characters.'
+    if (password.length < 8) {
+        return 'Your password must be at least 8 characters long.'
     }
-
+    if (!/[A-Za-z]/.test(password)) {
+        return 'Your password must contain at least one letter.'
+    }
     if (!/[0-9]/.test(password)) {
         return 'Your password must contain at least one number.'
-    }
-
-    if (password.length >= 10) {
-        return 'Your password must be shorter than 10 characters.'
     }
     return ''
 }

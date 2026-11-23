@@ -1,13 +1,23 @@
 
+import os
 import unittest
 from io import BytesIO
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from src.main.app import create_app
 
 
 class ResumeApiTests(unittest.TestCase):
+
+    def test_legacy_service_role_environment_name_is_accepted(self):
+        with patch.dict(os.environ, {
+            "SUPABASE_SERVICE_KEY": "",
+            "SUPABASE_SERVICE_ROLE_KEY": "test-service-key",
+        }):
+            app = create_app({"TESTING": True})
+
+        self.assertEqual(app.config["SUPABASE_SERVICE_KEY"], "test-service-key")
 
     def setUp(self):
         self.profile_id = "550e8400-e29b-41d4-a716-446655440000"
@@ -127,6 +137,22 @@ class ResumeApiTests(unittest.TestCase):
         self.assertEqual(data["file_name"], "resume.pdf")
         self.assertIn("download_url", data)
         self.storage.create_signed_url.assert_called_once()
+
+    def test_get_resume_requires_storage_service_key(self):
+        self.cursor.fetchone.return_value = self.resume_row
+        self.app.config.update({
+            "SUPABASE_CLIENT_FACTORY": None,
+            "SUPABASE_URL": "https://example.supabase.co",
+            "SUPABASE_KEY": "public-key",
+            "SUPABASE_SERVICE_KEY": "",
+        })
+
+        with patch("src.main.app.create_client", return_value=self.supabase) as create_client:
+            response = self.client.get(self.url, headers=self.headers)
+
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(create_client.call_count, 1)
+        self.storage.create_signed_url.assert_not_called()
 
     def test_replace_resume_succeeds(self):
         updated_row = (

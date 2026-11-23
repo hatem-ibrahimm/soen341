@@ -14,8 +14,10 @@ DECLARE
   seeker    uuid := 'f3000000-0000-4000-8000-000000000003';
   outsider  uuid := 'f3000000-0000-4000-8000-000000000004';
   v_job bigint;
+  v_resume_test_job bigint;
   v_app uuid;
   v_resume uuid;
+  v_other_resume uuid;
   v_notif uuid;
   v_interview uuid;
   n int;
@@ -39,9 +41,17 @@ BEGIN
     VALUES (recruiter, 'Junior Developer', 'Northwind', 'Montreal, QC', 'Engineering', 'Build things.', 'published')
     RETURNING id INTO v_job;
 
+    INSERT INTO public.jobs (recruiter_id, title, company_name, location, category, description, status)
+    VALUES (recruiter, 'QA Developer', 'Northwind', 'Montreal, QC', 'Engineering', 'Test things.', 'published')
+    RETURNING id INTO v_resume_test_job;
+
     INSERT INTO public.resumes (profile_id, file_name, storage_path, content_type, file_size)
     VALUES (seeker, 'cv.pdf', seeker::text || '/cv.pdf', 'application/pdf', 1000)
     RETURNING id INTO v_resume;
+
+    INSERT INTO public.resumes (profile_id, file_name, storage_path, content_type, file_size)
+    VALUES (outsider, 'other-cv.pdf', outsider::text || '/other-cv.pdf', 'application/pdf', 1000)
+    RETURNING id INTO v_other_resume;
 
     INSERT INTO public.applications (applicant_id, job_id, resume_id, cover_letter, status)
     VALUES (seeker, v_job, v_resume, 'Hello', 'Applied')
@@ -122,6 +132,16 @@ BEGIN
       results := results || jsonb_build_object('feature', 'Recruiter dashboard', 'test', 'AT-S3-D3',
         'checks', 'a recruiter can update a candidate''s status',
         'result', CASE WHEN (SELECT status FROM public.applications WHERE id = v_app) = 'Interview'
+                       THEN 'PASS' ELSE 'FAIL' END);
+
+      ok := false;
+      BEGIN
+        UPDATE public.applications SET cover_letter = 'Changed by recruiter' WHERE id = v_app;
+      EXCEPTION WHEN insufficient_privilege THEN ok := true;
+      END;
+      results := results || jsonb_build_object('feature', 'Recruiter dashboard', 'test', 'AT-S3-D7',
+        'checks', 'a recruiter can update status but cannot rewrite application details',
+        'result', CASE WHEN ok AND (SELECT cover_letter FROM public.applications WHERE id = v_app) = 'Hello'
                        THEN 'PASS' ELSE 'FAIL' END);
 
       PERFORM set_config('request.jwt.claim.sub', rival::text, true);
@@ -303,6 +323,16 @@ BEGIN
 
       PERFORM set_config('request.jwt.claim.sub', seeker::text, true);
       PERFORM set_config('request.jwt.claims', json_build_object('sub', seeker, 'role', 'authenticated')::text, true);
+
+      ok := false;
+      BEGIN
+        INSERT INTO public.applications (applicant_id, job_id, resume_id, status)
+        VALUES (seeker, v_resume_test_job, v_other_resume, 'Applied');
+      EXCEPTION WHEN insufficient_privilege THEN ok := true;
+      END;
+      results := results || jsonb_build_object('feature', 'Applications', 'test', 'AT-S3-A1',
+        'checks', 'an applicant cannot attach another user''s resume to an application',
+        'result', CASE WHEN ok THEN 'PASS' ELSE 'FAIL' END);
 
       results := results || jsonb_build_object('feature', 'Reminders', 'test', 'AT-S3-M1',
         'checks', 'a recruiter can set a deadline on a posting and job seekers see it',

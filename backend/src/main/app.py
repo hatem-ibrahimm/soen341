@@ -8,7 +8,6 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from supabase import create_client
 from werkzeug.utils import secure_filename
-from werkzeug.utils import secure_filename
 
 try:
     import psycopg2
@@ -57,7 +56,10 @@ def create_app(test_config=None):
     app.config.from_mapping(
         SUPABASE_URL=os.getenv("SUPABASE_URL", ""),
         SUPABASE_KEY=os.getenv("SUPABASE_KEY", ""),
-        SUPABASE_SERVICE_KEY=os.getenv("SUPABASE_SERVICE_KEY", ""),
+        SUPABASE_SERVICE_KEY=(
+            os.getenv("SUPABASE_SERVICE_KEY")
+            or os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+        ),
         DATABASE_URL=os.getenv("DATABASE_URL", ""),
         MIN_PASSWORD_LENGTH=int(os.getenv("MIN_PASSWORD_LENGTH", "8")),
         RESUME_BUCKET=os.getenv("SUPABASE_RESUME_BUCKET", "resumes"),
@@ -93,7 +95,9 @@ def create_app(test_config=None):
         service_key = app.config.get("SUPABASE_SERVICE_KEY")
 
         if not service_key:
-            return get_supabase()
+            raise RuntimeError(
+                "SUPABASE_SERVICE_KEY must be configured for private storage access."
+            )
 
         if not app.config["SUPABASE_URL"]:
             raise RuntimeError("SUPABASE_URL must be configured.")
@@ -149,6 +153,44 @@ def create_app(test_config=None):
         else:
             from recruiter_postings import _recruiter_id
         return "recruiter" if _recruiter_id(user, get_connection) else "job_seeker"
+
+    def get_account_company_name(user, role):
+        if role != "recruiter":
+            return ""
+
+        metadata = getattr(user, "user_metadata", None)
+        if isinstance(metadata, dict):
+            company_name = metadata.get("company_name")
+            if isinstance(company_name, str) and company_name.strip():
+                return company_name.strip()
+
+        app_metadata = getattr(user, "app_metadata", None)
+        if isinstance(app_metadata, dict):
+            roles = app_metadata.get("roles", [])
+            if app_metadata.get("role") == "recruiter" or (
+                isinstance(roles, (list, tuple)) and "recruiter" in roles
+            ):
+                return ""
+
+        connection = cursor = None
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+            cursor.execute(
+                "SELECT company_name FROM public.recruiters WHERE id = %s",
+                (str(user.id),),
+            )
+            row = cursor.fetchone()
+            if row and isinstance(row[0], str):
+                return row[0].strip()
+        except Exception:
+            app.logger.exception("Recruiter company lookup failed")
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if connection is not None:
+                connection.close()
+        return ""
 
     def check_profile_access(profile_id):
         """
@@ -344,6 +386,7 @@ def create_app(test_config=None):
             except Exception:
                 app.logger.exception("Account role lookup failed during login")
                 return jsonify({"error": "Unable to determine account role."}), 503
+            company_name = get_account_company_name(user, role)
 
             return jsonify(
                 {
@@ -352,6 +395,7 @@ def create_app(test_config=None):
                         "id": str(user.id),
                         "email": user.email,
                         "role": role,
+                        "company_name": company_name,
                     },
                     "session": {
                         "access_token": session.access_token,
@@ -390,6 +434,7 @@ def create_app(test_config=None):
         except Exception:
             app.logger.exception("Account role lookup failed in /api/auth/me")
             return jsonify({"error": "Unable to determine account role."}), 503
+        company_name = get_account_company_name(user, role)
 
         return jsonify(
             {
@@ -397,6 +442,7 @@ def create_app(test_config=None):
                     "id": str(user.id),
                     "email": user.email,
                     "role": role,
+                    "company_name": company_name,
                 }
             }
         ), 200

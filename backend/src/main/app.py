@@ -1559,6 +1559,16 @@ def create_app(test_config=None):
         app, get_connection, get_current_user, get_resume_storage
     )
 
+    # Sprint 4: AI job matching suggestions
+    if __package__:
+        from .ai_job_matching import register_ai_job_matching_routes
+    else:
+        from ai_job_matching import register_ai_job_matching_routes
+
+    register_ai_job_matching_routes(
+        app, get_connection, get_current_user, get_resume_storage
+    )
+
     return app
 
 

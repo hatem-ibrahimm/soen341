@@ -1,7 +1,7 @@
-import { request, USE_MOCK_API } from './apiClient.js'
-import { getUserId } from './session.js'
-import { delay, MOCK_JOBS, newId, readDb, writeDb } from './mockStore.js'
-import { toJob } from './jobsApi.js'
+import {request, USE_MOCK_API} from './apiClient.js'
+import {getUserId} from './session.js'
+import {delay, MOCK_JOBS, newId, readDb, writeDb} from './mockStore.js'
+import {toJob} from './jobsApi.js'
 
 function formatSalary(min, max) {
     const format = (amount) =>
@@ -112,6 +112,35 @@ export async function updateJobListing(jobId, changes) {
         throw new Error('The server did not return the updated job listing.')
     }
     return job
+}
+
+export async function deleteJobListing(jobId) {
+    if (USE_MOCK_API) {
+        const db = readDb()
+        const index = (db.jobs ?? MOCK_JOBS).findIndex(
+            (job) =>
+                String(job.id) === String(jobId) &&
+                job.recruiter_id === getUserId(),
+        )
+        if (index < 0) throw new Error('Job posting not found.')
+        if ((db.jobs ?? MOCK_JOBS)[index].status !== 'archived') {
+            throw new Error('Only archived job listings can be deleted.')
+        }
+
+        const jobs = [...(db.jobs ?? MOCK_JOBS)]
+        jobs.splice(index, 1)
+        db.jobs = jobs
+        db.applications = (db.applications ?? []).filter(
+            (application) => String(application.job_id) !== String(jobId),
+        )
+        writeDb(db)
+        return delay({ id: jobId })
+    }
+
+    return await request(
+        `/api/recruiter/jobs/${encodeURIComponent(jobId)}`,
+        {method: 'DELETE'},
+    )
 }
 
 export async function listRecruiterApplications(jobId) {

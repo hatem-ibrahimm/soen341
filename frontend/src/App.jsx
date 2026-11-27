@@ -11,6 +11,7 @@ import AnalyticsDashboardPage from './features/analytics/AnalyticsDashboardPage.
 import ApplicationSubmittedPage from './features/applications/ApplicationSubmittedPage.jsx'
 import ApplyPage from './features/applications/ApplyPage.jsx'
 import MyApplicationsPage from './features/applications/MyApplicationsPage.jsx'
+import InterviewCoordinationPage from './features/applications/InterviewCoordinationPage.jsx'
 import NotificationsPage from './features/notifications/NotificationsPage.jsx'
 import JobDetailsPlaceholderPage from './features/jobs/JobDetailsPlaceholderPage.jsx'
 import JobsPlaceholderPage from './features/jobs/JobsPlaceholderPage.jsx'
@@ -41,6 +42,7 @@ function App() {
                     <Route path="/jobs/:jobId/apply" element={<ApplyPage />} />
                     <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/applications" element={<MyApplicationsPage />} />
+                    <Route path="/applications/:applicationId/interview" element={<InterviewCoordinationPage />} />
                     <Route path="/notifications" element={<NotificationsPage />} />
                     <Route
                         path="/recruiter"

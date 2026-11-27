@@ -313,6 +313,28 @@ class RecruiterPostingTests(unittest.TestCase):
         self.assertEqual(self.cursor.execute.call_args_list[1].args[1],
                          ("archived", 42, RECRUITER_ID))
 
+    def test_delete_rejects_non_archived_posting(self):
+        self.cursor.fetchone.return_value = ("published",)
+        response = self.client.delete(
+            "/api/recruiter/jobs/42",
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 409)
+        self.connection.rollback.assert_called_once()
+
+    def test_delete_archived_posting(self):
+        self.cursor.fetchone.return_value = ("archived",)
+        response = self.client.delete(
+            "/api/recruiter/jobs/42",
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 200)
+        delete_sql, delete_args = self.cursor.execute.call_args_list[1].args
+        self.assertIn("DELETE FROM public.jobs", delete_sql)
+        self.assertIn("status = 'archived'", delete_sql)
+        self.assertEqual(delete_args, (42, RECRUITER_ID))
+        self.connection.commit.assert_called_once()
+
     def test_update_sets_deadline(self):
         self.cursor.fetchone.side_effect = [
             (Decimal("65000"), Decimal("85000")),

@@ -69,10 +69,10 @@ export default function MyApplicationsPage() {
         <div className={styles.appsWrap}>
             <div className={styles.appsHeader}>
                 <div>
-                    <h1 className={styles.pageTitle}>My applications</h1>
+                    <h1 className={styles.pageTitle}>My Applications</h1>
                     <p className={styles.muted}>Track every job you’ve applied to and where it stands.</p>
                 </div>
-                <Link to="/jobs" className={styles.primaryLink}>Find more jobs</Link>
+                <Link to="/jobs" className={styles.secondaryLink}>Jobs Listings</Link>
             </div>
 
             <div className={styles.statRow} role="tablist" aria-label="Filter by status">
@@ -112,7 +112,7 @@ export default function MyApplicationsPage() {
                         <EmptyState
                             icon="▤"
                             title={apps.length === 0 ? 'No applications yet' : 'Nothing matches this filter'}
-                            action={apps.length === 0 && <Link to="/jobs" className={styles.primaryLink}>Browse jobs</Link>}
+                            action={apps.length === 0 && <Link to="/jobs" className={styles.secondaryLink}>Jobs Listings</Link>}
                         >
                             {apps.length === 0 ? 'When you apply to a job it will show up here so you can follow its progress.' : 'Try another status or clear the search.'}
                         </EmptyState>

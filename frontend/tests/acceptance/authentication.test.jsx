@@ -42,7 +42,7 @@ describe('Logging in', () => {
         await user.type(screen.getByLabelText('Password'), 'secret12')
         await user.click(screen.getByRole('button', { name: 'Log in' }))
 
-        expect(await screen.findByRole('heading', { name: 'Find jobs' })).toBeInTheDocument()
+        expect(await screen.findByRole('heading', { name: 'Jobs Listings' })).toBeInTheDocument()
         const [url, options] = fetchSpy.mock.calls[0]
         expect(url).toMatch(/\/api\/auth\/login$/)
         expect(JSON.parse(options.body)).toEqual({ email: 'maya@example.com', password: 'secret12' })

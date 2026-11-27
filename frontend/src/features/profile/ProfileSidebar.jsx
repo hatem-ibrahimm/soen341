@@ -26,8 +26,8 @@ export default function ProfileSidebar() {
             </nav>
             <div className={styles.sideBox}>
                 <p className={styles.sideTitle}>Job search</p>
-                <Link className={styles.sideLink} to="/applications">Track my applications</Link>
-                <Link className={styles.sideLink} to="/jobs">Browse jobs</Link>
+                <Link className={styles.sideLink} to="/applications">My Applications</Link>
+                <Link className={styles.sideLink} to="/jobs">Jobs Listings</Link>
             </div>
         </aside>
     )

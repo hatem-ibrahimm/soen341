@@ -373,3 +373,43 @@ def test_mark_notification_read_closes_resources(setup_notifications):
 
     cursor.close.assert_called_once()
     connection.close.assert_called_once()
+
+
+# --------------------------------------------------
+# DELETE NOTIFICATION TESTS
+# --------------------------------------------------
+
+def test_delete_notification_success(setup_notifications):
+    client, cursor, connection, _ = setup_notifications
+    cursor.fetchone.return_value = (NOTIFICATION_ID,)
+
+    response = client.delete(f"/api/notifications/{NOTIFICATION_ID}")
+
+    assert response.status_code == 200
+    assert response.get_json()["message"] == "Notification deleted."
+    sql, params = cursor.execute.call_args.args
+    assert "DELETE FROM notifications" in sql
+    assert "WHERE id = %s AND user_id = %s" in sql
+    assert params == (NOTIFICATION_ID, USER_ID)
+    connection.commit.assert_called_once()
+
+
+def test_delete_notification_not_owned_by_user(setup_notifications):
+    client, cursor, connection, _ = setup_notifications
+    cursor.fetchone.return_value = None
+
+    response = client.delete(f"/api/notifications/{NOTIFICATION_ID}")
+
+    assert response.status_code == 404
+    connection.rollback.assert_called_once()
+    connection.commit.assert_not_called()
+
+
+def test_delete_notification_requires_authentication(setup_notifications):
+    client, cursor, _, current_user = setup_notifications
+    current_user["value"] = None
+
+    response = client.delete(f"/api/notifications/{NOTIFICATION_ID}")
+
+    assert response.status_code == 401
+    cursor.execute.assert_not_called()

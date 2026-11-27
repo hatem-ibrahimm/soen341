@@ -52,7 +52,7 @@ export default function JobDetailsPlaceholderPage() {
                 <button type="button" onClick={() => setRetryCount((count) => count + 1)}>
                     Retry
                 </button>
-                <Link to={`/jobs${location.search}`} className={styles.back}>← Back to jobs</Link>
+                <Link to={`/jobs${location.search}`} className={styles.back}>← Jobs Listings</Link>
             </div>
         )
     }
@@ -68,7 +68,7 @@ export default function JobDetailsPlaceholderPage() {
 
     return (
         <div className={styles.wrap}>
-            <Link to={`/jobs${location.search}`} className={styles.back}>← Back to jobs</Link>
+            <Link to={`/jobs${location.search}`} className={styles.back}>← Jobs Listings</Link>
             <Card className={styles.detailCard}>
                 <header className={styles.detailHeader}>
                     <CompanyLogo name={company} size={60} />
@@ -107,7 +107,7 @@ export default function JobDetailsPlaceholderPage() {
             <div className={styles.detailActions}>
                 {applied ? (
                     <Link to={`/applications?highlight=${applied.id}`} className={styles.applied}>
-                        ✓ Applied · view status
+                        My Applications
                     </Link>
                 ) : (
                     <Link to={`/jobs/${job.id}/apply`} className={styles.apply}>Apply now</Link>

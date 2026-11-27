@@ -78,6 +78,6 @@ describe('Application analytics and history dashboard', () => {
         renderApp('/dashboard')
 
         expect(await screen.findByText('Nothing to chart yet')).toBeInTheDocument()
-        expect(screen.getByRole('link', { name: 'Browse jobs' })).toHaveAttribute('href', '/jobs')
+        expect(screen.getAllByRole('link', { name: 'Jobs Listings' }).every((link) => link.getAttribute('href') === '/jobs')).toBe(true)
     })
 })

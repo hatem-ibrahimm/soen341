@@ -42,10 +42,10 @@ export default function AppLayout() {
                     </Link>
                     <nav className={styles.nav} aria-label="Main">
                         <NavLink to="/jobs" className={navClass}>
-                            Jobs
+                            Jobs Listings
                         </NavLink>
                         <NavLink to="/applications" className={navClass}>
-                            My applications
+                            My Applications
                         </NavLink>
                         <NavLink to="/dashboard" className={navClass}>
                             Dashboard

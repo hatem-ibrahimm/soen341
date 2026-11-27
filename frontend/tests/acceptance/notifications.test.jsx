@@ -23,4 +23,22 @@ describe('Notifications', () => {
 
         await waitFor(() => expect(navLink()).toHaveTextContent('14'))
     })
+
+    test('deleting a notification removes it from the list', async () => {
+        const { user } = renderApp('/notifications')
+        await waitFor(() => expect(navLink()).toHaveTextContent('14'))
+
+        const statusUpdates = await screen.findAllByRole('heading', {
+            name: 'Application Status Updated',
+        })
+        const beforeCount = statusUpdates.length
+        await user.click(screen.getAllByRole('button', { name: /^Delete notification:/ })[0])
+
+        await waitFor(() => {
+            expect(screen.queryAllByRole('heading', {
+                name: 'Application Status Updated',
+            })).toHaveLength(beforeCount - 1)
+        })
+        await waitFor(() => expect(navLink()).toHaveTextContent('14'))
+    })
 })

@@ -259,6 +259,52 @@ def register_recruiter_posting_routes(app, get_connection, get_current_user):
             if conn is not None:
                 conn.close()
 
+    @app.delete("/api/recruiter/jobs/<int:job_id>")
+    def recruiter_delete_job(job_id):
+        recruiter, error = authorize()
+        if error:
+            return error
+        if job_id < 1:
+            return jsonify({"error": "Invalid job ID."}), 400
+
+        conn = cursor = None
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT status FROM public.jobs "
+                "WHERE id = %s AND recruiter_id = %s",
+                (job_id, recruiter),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                conn.rollback()
+                return jsonify({"error": "Job posting not found."}), 404
+            if row[0] != "archived":
+                conn.rollback()
+                return jsonify({"error": "Only archived job listings can be deleted."}), 409
+
+            cursor.execute(
+                "DELETE FROM public.jobs "
+                "WHERE id = %s AND recruiter_id = %s AND status = 'archived'",
+                (job_id, recruiter),
+            )
+            conn.commit()
+            return jsonify({
+                "message": "Archived job listing and associated data deleted.",
+                "id": job_id,
+            }), 200
+        except Exception:
+            if conn is not None:
+                conn.rollback()
+            app.logger.exception("Recruiter job deletion failed")
+            return jsonify({"error": "Unable to delete the archived job listing."}), 500
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
     @app.get("/api/recruiter/jobs")
     def recruiter_list_jobs():
         recruiter, error = authorize()

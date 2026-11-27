@@ -5,10 +5,18 @@
 }
 .header h1 { margin: 4px 0 6px; font-size: 1.5rem; }
 .header p { margin: 0; color: var(--cc-muted); }
+.headerAction {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 9px 18px; border: 1px solid var(--cc-border-strong);
+  border-radius: var(--cc-radius-sm); background: var(--cc-surface);
+  color: var(--cc-primary); font-size: 0.93rem; font-weight: 600;
+  text-decoration: none; white-space: nowrap;
+}
+.headerAction:hover { background: var(--cc-primary-soft); text-decoration: none; }
 .header > a, .actions a, .actions button {
   color: var(--cc-primary); font-weight: 600; text-decoration: none;
 }
-.header > a:hover, .actions a:hover { text-decoration: underline; }
+.actions a:hover { text-decoration: underline; }
 .card { padding: 0 !important; overflow: hidden; }
 .message { margin: 0; padding: 20px; }
 .message button {
@@ -18,7 +26,7 @@
 .list { list-style: none; margin: 0; padding: 0; }
 .item {
   display: flex; gap: 14px; padding: 18px 20px;
-  border-top: 1px solid var(--cc-border);
+  border-top: 1px solid var(--cc-border-strong);
 }
 .item:first-child { border-top: 0; }
 .unread { background: var(--cc-primary-soft); }
@@ -32,9 +40,26 @@
 .titleRow h2 { margin: 0; font-size: 1rem; }
 .titleRow time { color: var(--cc-muted); font-size: 0.82rem; white-space: nowrap; }
 .content p { margin: 6px 0 0; color: var(--cc-muted); }
-.actions { display: flex; gap: 16px; margin-top: 10px; font-size: 0.88rem; }
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 0.88rem;
+}
 .actions button {
   padding: 0; border: 0; background: none; cursor: pointer; font-size: inherit;
+}
+.actions .deleteAction {
+  color: var(--cc-danger);
+  margin-left: auto;
+  padding: 6px 10px;
+  border: 1px solid var(--cc-danger);
+  border-radius: var(--cc-radius-sm);
+  background: var(--cc-surface);
+}
+.actions .deleteAction:hover {
+  background: var(--cc-danger-soft);
 }
 @media (max-width: 520px) {
   .titleRow { align-items: flex-start; flex-direction: column; gap: 3px; }

@@ -70,6 +70,56 @@ def register_notification_routes(app, get_connection, get_current_user):
             if conn is not None:
                 conn.close()
 
+    @app.delete("/api/notifications/<notification_id>")
+    def delete_notification(notification_id):
+        """Delete one of the logged-in user's notifications."""
+        user = get_current_user()
+
+        if user is None:
+            return jsonify({"error": "Authentication required."}), 401
+
+        if not valid_uuid(notification_id):
+            return jsonify({"error": "Invalid notification ID."}), 400
+
+        user_id = str(user.id)
+        if not valid_uuid(user_id):
+            return jsonify({"error": "Invalid user ID."}), 500
+
+        conn = None
+        cursor = None
+
+        try:
+            conn = get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """
+                DELETE FROM notifications
+                WHERE id = %s AND user_id = %s
+                RETURNING id
+                """,
+                (notification_id, user_id),
+            )
+
+            if cursor.fetchone() is None:
+                conn.rollback()
+                return jsonify({"error": "Notification not found."}), 404
+
+            conn.commit()
+            return jsonify({"message": "Notification deleted."}), 200
+
+        except Exception:
+            if conn is not None:
+                conn.rollback()
+            app.logger.exception("Notification deletion failed")
+            return jsonify({"error": "Unable to delete notification."}), 500
+
+        finally:
+            if cursor is not None:
+                cursor.close()
+            if conn is not None:
+                conn.close()
+
     @app.get("/api/notifications/unread-count")
     def get_unread_count():
         """Count unread notifications for the logged-in user."""

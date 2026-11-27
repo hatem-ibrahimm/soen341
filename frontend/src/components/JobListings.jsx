@@ -212,7 +212,7 @@ function JobListings() {
     return (
         <main className="job-listings-page">
             <Link to="/">← Home</Link>
-            <h1>Find jobs</h1>
+            <h1>Jobs Listings</h1>
 
             <p className="job-prototype-notice" role="note">
                 {JOBS_DATA_MODE === 'mock'

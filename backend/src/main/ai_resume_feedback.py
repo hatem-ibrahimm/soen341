@@ -4,12 +4,19 @@ import uuid
 from flask import jsonify, request
 
 if __package__:
-    from .ai_resume_service import generate_resume_feedback
+    from .ai_resume_service import (
+        generate_resume_feedback,
+        AIServiceError,
+        AIResponseError,
+    )
     from .resume_text_extraction import extract_resume_text
 else:
-    from ai_resume_service import generate_resume_feedback
+    from ai_resume_service import (
+        generate_resume_feedback,
+        AIServiceError,
+        AIResponseError,
+    )
     from resume_text_extraction import extract_resume_text
-
 
 FEEDBACK_FIELDS = (
     "strengths",
@@ -19,17 +26,38 @@ FEEDBACK_FIELDS = (
 
 
 def _clean_feedback(feedback):
+    """Validate and clean the structured AI feedback."""
+
     if not isinstance(feedback, dict):
-        raise ValueError("The AI service returned invalid feedback.")
+        raise AIResponseError(
+            "The AI service returned invalid feedback."
+        )
+
+    if set(feedback.keys()) != set(FEEDBACK_FIELDS):
+        raise AIResponseError(
+            "The AI service returned unexpected feedback categories."
+        )
 
     clean = {}
+
     for field in FEEDBACK_FIELDS:
         items = feedback.get(field)
+
         if not isinstance(items, list) or any(
-            not isinstance(item, str) or not item.strip() for item in items
+            not isinstance(item, str) or not item.strip()
+            for item in items
         ):
-            raise ValueError("The AI service returned invalid feedback.")
+            raise AIResponseError(
+                "The AI service returned invalid feedback."
+            )
+
         clean[field] = [item.strip() for item in items]
+
+    if not any(clean.values()):
+        raise AIResponseError(
+            "The AI service returned empty feedback."
+        )
+
     return clean
 
 
@@ -111,6 +139,25 @@ def register_ai_resume_feedback_routes(
             feedback = _clean_feedback(generate_resume_feedback(resume_text))
             cursor.execute(
                 """
+                SELECT uploaded_at, storage_path
+                FROM public.resumes
+                WHERE id = %s AND profile_id = %s
+                FOR UPDATE
+                """,
+                (resume_id, profile_id),
+            )
+
+            current_resume = cursor.fetchone()
+
+            if current_resume != (uploaded_at, storage_path):
+                connection.rollback()
+
+                return jsonify({
+                    "error": "Resume changed during analysis. Please try again."
+                }), 409
+            
+            cursor.execute(
+                """
                 INSERT INTO public.resume_feedback (
                     resume_id, resume_updated_at, strengths,
                     areas_for_improvement, recommendations
@@ -139,11 +186,35 @@ def register_ai_resume_feedback_routes(
                 **feedback,
                 "generated_at": _isoformat(generated_at),
             }), 200
+        except AIServiceError:
+            if connection is not None:
+                connection.rollback()
+
+            app.logger.warning("AI resume service unavailable")
+
+            return jsonify({
+                "error": "AI resume feedback is temporarily unavailable."
+            }), 503
+
+        except AIResponseError:
+            if connection is not None:
+                connection.rollback()
+
+            app.logger.warning("Invalid AI resume feedback received")
+
+            return jsonify({
+                "error": "Invalid AI feedback received. Please try again."
+            }), 502
+
         except Exception:
             if connection is not None:
                 connection.rollback()
-            app.logger.exception("AI resume feedback request failed")
-            return jsonify({"error": "Unable to analyze resume."}), 500
+
+            app.logger.error("AI resume feedback request failed")
+
+            return jsonify({
+                "error": "Unable to analyze resume."
+            }), 500
         finally:
             if cursor is not None:
                 cursor.close()

@@ -7,7 +7,10 @@ import pytest
 from flask import Flask
 
 from src.main.ai_resume_feedback import register_ai_resume_feedback_routes
-
+from src.main.ai_resume_service import (
+    AIServiceError,
+    AIResponseError,
+)
 
 USER_ID = str(uuid.UUID("11111111-1111-4111-8111-111111111111"))
 OTHER_USER_ID = str(uuid.UUID("22222222-2222-4222-8222-222222222222"))
@@ -43,9 +46,10 @@ def feedback_api():
 def test_post_returns_and_persists_latest_feedback(feedback_api):
     client, cursor, connection, storage, _ = feedback_api
     cursor.fetchone.side_effect = [
-        (RESUME_ID, "resume.pdf", "resume/path.pdf", UPLOADED_AT),
-        (GENERATED_AT,),
-    ]
+    (RESUME_ID, "resume.pdf", "resume/path.pdf", UPLOADED_AT),
+    (UPLOADED_AT, "resume/path.pdf"),
+    (GENERATED_AT,),
+]
 
     with (
         patch("src.main.ai_resume_feedback.extract_resume_text", return_value="Resume text"),
@@ -104,3 +108,181 @@ def test_feedback_endpoints_require_owner_access(feedback_api):
     assert response.status_code == 403
     connection.cursor.assert_not_called()
     cursor.execute.assert_not_called()
+
+def test_feedback_requires_authentication(feedback_api):
+    client, _, connection, _, current_user = feedback_api
+
+    current_user["value"] = None
+
+    response = client.post(
+        f"/api/profiles/{USER_ID}/resume/feedback"
+    )
+
+    assert response.status_code == 401
+    connection.cursor.assert_not_called()
+
+
+def test_invalid_profile_id(feedback_api):
+    client, _, _, _, _ = feedback_api
+
+    response = client.post(
+        "/api/profiles/invalid-id/resume/feedback"
+    )
+
+    assert response.status_code == 400
+
+
+def test_resume_not_found(feedback_api):
+    client, cursor, _, _, _ = feedback_api
+
+    cursor.fetchone.return_value = None
+
+    response = client.post(
+        f"/api/profiles/{USER_ID}/resume/feedback"
+    )
+
+    assert response.status_code == 404
+
+
+def test_resume_extraction_failure(feedback_api):
+    client, cursor, _, _, _ = feedback_api
+
+    cursor.fetchone.return_value = (
+        RESUME_ID,
+        "resume.pdf",
+        "resume/path.pdf",
+        UPLOADED_AT,
+    )
+
+    with patch(
+        "src.main.ai_resume_feedback.extract_resume_text",
+        side_effect=ValueError("Unable to read resume."),
+    ):
+        response = client.post(
+            f"/api/profiles/{USER_ID}/resume/feedback"
+        )
+
+    assert response.status_code == 400
+
+
+def test_ai_service_unavailable(feedback_api):
+    client, cursor, connection, _, _ = feedback_api
+
+    cursor.fetchone.return_value = (
+        RESUME_ID,
+        "resume.pdf",
+        "resume/path.pdf",
+        UPLOADED_AT,
+    )
+
+    with (
+        patch(
+            "src.main.ai_resume_feedback.extract_resume_text",
+            return_value="Resume text",
+        ),
+        patch(
+            "src.main.ai_resume_feedback.generate_resume_feedback",
+            side_effect=AIServiceError("Service unavailable"),
+        ),
+    ):
+        response = client.post(
+            f"/api/profiles/{USER_ID}/resume/feedback"
+        )
+
+    assert response.status_code == 503
+    connection.rollback.assert_called_once()
+    connection.commit.assert_not_called()
+
+
+def test_invalid_ai_response(feedback_api):
+    client, cursor, connection, _, _ = feedback_api
+
+    cursor.fetchone.return_value = (
+        RESUME_ID,
+        "resume.pdf",
+        "resume/path.pdf",
+        UPLOADED_AT,
+    )
+
+    with (
+        patch(
+            "src.main.ai_resume_feedback.extract_resume_text",
+            return_value="Resume text",
+        ),
+        patch(
+            "src.main.ai_resume_feedback.generate_resume_feedback",
+            side_effect=AIResponseError("Invalid response"),
+        ),
+    ):
+        response = client.post(
+            f"/api/profiles/{USER_ID}/resume/feedback"
+        )
+
+    assert response.status_code == 502
+    connection.commit.assert_not_called()
+
+
+def test_empty_ai_feedback(feedback_api):
+    client, cursor, connection, _, _ = feedback_api
+
+    cursor.fetchone.return_value = (
+        RESUME_ID,
+        "resume.pdf",
+        "resume/path.pdf",
+        UPLOADED_AT,
+    )
+
+    empty_feedback = {
+        "strengths": [],
+        "areas_for_improvement": [],
+        "recommendations": [],
+    }
+
+    with (
+        patch(
+            "src.main.ai_resume_feedback.extract_resume_text",
+            return_value="Resume text",
+        ),
+        patch(
+            "src.main.ai_resume_feedback.generate_resume_feedback",
+            return_value=empty_feedback,
+        ),
+    ):
+        response = client.post(
+            f"/api/profiles/{USER_ID}/resume/feedback"
+        )
+
+    assert response.status_code == 502
+    connection.commit.assert_not_called()
+
+
+def test_resume_changed_during_analysis(feedback_api):
+    client, cursor, connection, _, _ = feedback_api
+
+    cursor.fetchone.side_effect = [
+        (
+            RESUME_ID,
+            "resume.pdf",
+            "resume/path.pdf",
+            UPLOADED_AT,
+        ),
+        (GENERATED_AT, "resume/new-path.pdf"),
+    ]
+
+    with (
+        patch(
+            "src.main.ai_resume_feedback.extract_resume_text",
+            return_value="Resume text",
+        ),
+        patch(
+            "src.main.ai_resume_feedback.generate_resume_feedback",
+            return_value=FEEDBACK,
+        ),
+    ):
+        response = client.post(
+            f"/api/profiles/{USER_ID}/resume/feedback"
+        )
+
+    assert response.status_code == 409
+    connection.rollback.assert_called_once()
+    connection.commit.assert_not_called()

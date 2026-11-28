@@ -1,8 +1,9 @@
 # Frontend CI: every push and pull request is checked automatically by GitHub.
 # It installs the frontend, then runs, in order:
-#   1. npm run lint   -> code style / common mistakes (oxlint)
-#   2. npm test       -> acceptance tests in frontend/tests/acceptance (Vitest)
-#   3. npm run build  -> makes sure the app still builds for production
+#   1. npm run lint            -> code style / common mistakes (oxlint)
+#   2. npm run test:unit       -> unit tests in frontend/tests/unit (Vitest)
+#   3. npm run test:acceptance -> acceptance tests in frontend/tests/acceptance (Vitest)
+#   4. npm run build           -> makes sure the app still builds for production
 # If any step fails, the run gets a red ❌ and the PR shows the check as failed.
 
 name: Frontend Tests
@@ -51,8 +52,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Run unit tests
+        run: npm run test:unit
+
       - name: Run acceptance tests
-        run: npm test
+        run: npm run test:acceptance
 
       - name: Build
         run: npm run build

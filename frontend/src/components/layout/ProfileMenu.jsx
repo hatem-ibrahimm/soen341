@@ -49,6 +49,7 @@ export default function ProfileMenu() {
                     </div>
                     <Link to="/profile" role="menuitem" onClick={close}>My profile</Link>
                     <Link to="/resume-feedback" role="menuitem" onClick={close}>Resume feedback</Link>
+                    <Link to="/matches" role="menuitem" onClick={close}>Job matches</Link>
                     <hr />
                     <Link to="/jobs" role="menuitem" onClick={close}>Jobs Listings</Link>
                     <Link to="/applications" role="menuitem" onClick={close}>My Applications</Link>

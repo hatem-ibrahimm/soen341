@@ -18,6 +18,7 @@ import JobDetailsPlaceholderPage from './features/jobs/JobDetailsPlaceholderPage
 import JobsPlaceholderPage from './features/jobs/JobsPlaceholderPage.jsx'
 import ProfilePage from './features/profile/ProfilePage.jsx'
 import ResumeFeedbackPage from './features/resumeFeedback/ResumeFeedbackPage.jsx'
+import JobMatchesPage from './features/jobMatching/JobMatchesPage.jsx'
 import { getUserRole, isLoggedIn } from './services/session.js'
 
 function App() {
@@ -68,6 +69,8 @@ function App() {
                         element={<AnalyticsDashboardPage />}
                     />
                     <Route path="/resume-feedback" element={<ResumeFeedbackPage />} />
+                    {/* Sprint 4 */}
+                    <Route path="/matches" element={<JobMatchesPage />} />
                 </Route>
             </Route>
             <Route path="/profilemanagement" element={<Navigate to="/profile" replace />} />

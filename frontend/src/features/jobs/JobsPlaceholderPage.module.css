@@ -83,3 +83,17 @@
   .searchActions { grid-column: auto; }
   .searchActions button { flex: 1; }
 }
+
+/* Sprint 4: link to AI job matches */
+.matchTeaser {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 16px; padding: 12px 16px; border-radius: var(--cc-radius);
+  background: var(--cc-surface); border: 1px solid var(--cc-border); border-left: 4px solid var(--cc-primary);
+  box-shadow: var(--cc-shadow);
+}
+.matchTeaser p { margin: 0; font-size: 0.93rem; }
+.matchTeaserLink {
+  padding: 7px 14px; border-radius: var(--cc-radius-sm); border: 1px solid var(--cc-primary);
+  color: var(--cc-primary); font-weight: 650; font-size: 0.87rem; text-decoration: none; white-space: nowrap;
+}
+.matchTeaserLink:hover { background: var(--cc-primary); color: #fff; }

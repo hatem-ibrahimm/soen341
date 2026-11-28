@@ -225,6 +225,10 @@ export default function JobsPlaceholderPage() {
     return (
         <div className={styles.wrap}>
             <h1 className={styles.h1}>Jobs Listings</h1>
+            <div className={styles.matchTeaser}>
+                <p>See the jobs that best fit your profile and resume.</p>
+                <Link to="/matches" className={styles.matchTeaserLink}>View my matches</Link>
+            </div>
             <SearchForm key={query} query={query} onSearch={search} onClear={clear} />
 
             {result.status === 'loading' && <p role="status">Loading jobs…</p>}

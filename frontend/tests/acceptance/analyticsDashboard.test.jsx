@@ -7,7 +7,7 @@ import { readDb, writeDb } from '../../src/services/mockStore.js'
 import { renderApp } from '../renderApp.jsx'
 
 async function openDashboard() {
-    const view = renderApp('/dashboard')
+    const view = renderApp('/dashboard', { role: 'job_seeker' })
     await screen.findByRole('heading', { name: 'Where things stand' })
     return view
 }
@@ -75,9 +75,9 @@ describe('Application analytics and history dashboard', () => {
 
     test('a job seeker with no applications sees an empty state', async () => {
         writeDb({ ...readDb(), applications: [] })
-        renderApp('/dashboard')
+        renderApp('/dashboard', { role: 'job_seeker' })
 
         expect(await screen.findByText('Nothing to chart yet')).toBeInTheDocument()
-        expect(screen.getByRole('link', { name: 'Browse jobs' })).toHaveAttribute('href', '/jobs')
+        expect(screen.getAllByRole('link', { name: 'Jobs Listings' }).every((link) => link.getAttribute('href') === '/jobs')).toBe(true)
     })
 })

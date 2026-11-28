@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Alert, Card, EmptyState } from '../../components/common'
-import { listNotifications, markNotificationRead } from '../../services/notificationsApi.js'
+import { deleteNotification, listNotifications, markNotificationRead } from '../../services/notificationsApi.js'
 import { timeAgo } from '../../services/format.js'
 import styles from './Notifications.module.css'
 
@@ -49,6 +49,19 @@ export default function NotificationsPage() {
         }
     }
 
+    async function removeNotification(notificationId) {
+        setActionError('')
+        try {
+            await deleteNotification(notificationId)
+            setNotifications((items) =>
+                items.filter((item) => item.id !== notificationId),
+            )
+            window.dispatchEvent(new Event('notifications:updated'))
+        } catch (requestError) {
+            setActionError(requestError.message || 'Unable to delete this notification.')
+        }
+    }
+
     function retry() {
         setNotifications(null)
         setError('')
@@ -62,7 +75,7 @@ export default function NotificationsPage() {
                     <h1>Notifications</h1>
                     <p>Updates about your job applications appear here.</p>
                 </div>
-                <Link to="/applications">View my applications</Link>
+                <Link to="/applications" className={styles.headerAction}>My Applications</Link>
             </header>
 
             {actionError && <Alert tone="error">{actionError}</Alert>}
@@ -85,9 +98,9 @@ export default function NotificationsPage() {
                     </EmptyState>
                 ) : (
                     <ul className={styles.list}>
-                        {notifications.map((notification) => (
+                        {notifications.map((notification, notificationIndex) => (
                             <li
-                                key={notification.id}
+                                key={`${notification.id}-${notificationIndex}`}
                                 className={`${styles.item} ${notification.is_read ? '' : styles.unread}`}
                             >
                                 <span className={styles.indicator} aria-hidden="true" />
@@ -101,9 +114,15 @@ export default function NotificationsPage() {
                                     <p>{notification.message}</p>
                                     <div className={styles.actions}>
                                         {notification.application_id && (
-                                            <Link to={`/applications?highlight=${encodeURIComponent(notification.application_id)}`}>
-                                                View application
-                                            </Link>
+                                            notification.type?.startsWith('interview') ? (
+                                                <Link to={`/applications/${encodeURIComponent(notification.application_id)}/interview`}>
+                                                    Open interview page
+                                                </Link>
+                                            ) : (
+                                                <Link to={`/applications?highlight=${encodeURIComponent(notification.application_id)}`}>
+                                                    View Application
+                                                </Link>
+                                            )
                                         )}
                                         {!notification.is_read && (
                                             <button
@@ -113,6 +132,14 @@ export default function NotificationsPage() {
                                                 Mark as read
                                             </button>
                                         )}
+                                        <button
+                                            type="button"
+                                            className={styles.deleteAction}
+                                            aria-label={`Delete notification: ${notification.title}`}
+                                            onClick={() => removeNotification(notification.id)}
+                                        >
+                                            Delete
+                                        </button>
                                     </div>
                                 </div>
                             </li>

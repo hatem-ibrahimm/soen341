@@ -172,6 +172,51 @@
     min-width: 0;
 }
 
+.recruiter-postings-scroll {
+    width: 100%;
+}
+
+.recruiter-archived-item {
+    min-width: 0;
+    padding: 0.9rem;
+    border: 1px solid var(--cc-border);
+    border-radius: var(--cc-radius-sm);
+}
+
+.recruiter-listing-summary {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0.75rem 0;
+}
+
+.recruiter-listing-summary dt {
+    font-weight: 600;
+}
+
+.recruiter-listing-summary dd {
+    margin: 0.2rem 0 0;
+}
+
+.recruiter-archived-item h4 {
+    margin: 0.75rem 0 0.5rem;
+}
+
+.recruiter-listing-skills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.recruiter-listing-skills li {
+    padding: 0.3rem 0.6rem;
+    border-radius: 0.35rem;
+    background: #e9eff6;
+    color: var(--cc-text);
+}
+
 .recruiter-form-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -216,6 +261,8 @@
 
 .recruiter-form-actions {
     display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
     justify-content: flex-end;
     margin-top: 1.25rem;
     padding-top: 1.25rem;
@@ -425,6 +472,11 @@
     color: var(--cc-danger);
 }
 
+.recruiter-status-archived {
+    background: var(--cc-border);
+    color: var(--cc-muted);
+}
+
 .recruiter-listing p {
     margin: 0.2rem 0;
 }
@@ -506,9 +558,41 @@
     gap: 0.65rem;
 }
 
+.recruiter-applicant-action-row {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
 .recruiter-applicant-actions a {
     text-decoration: none;
     white-space: nowrap;
+}
+
+.recruiter-coordinate-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    padding: 9px 18px;
+    border-radius: var(--cc-radius-sm);
+    background: var(--cc-primary);
+    color: #fff;
+    font-size: 0.93rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.recruiter-applicant-actions .recruiter-secondary-button {
+    color: var(--cc-text);
+}
+
+.recruiter-applicant-actions .recruiter-secondary-button:hover {
+    color: var(--cc-primary);
+}
+
+.recruiter-coordinate-link:hover {
+    background: var(--cc-primary-hover);
 }
 
 .recruiter-applicant-heading a,
@@ -521,10 +605,17 @@
     color: var(--cc-muted);
 }
 
+.recruiter-applicant-status-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
 .recruiter-applicant-status {
     display: grid;
+    flex: 0 0 12%;
     gap: 0.35rem;
-    margin-top: 0.75rem;
     color: var(--cc-muted);
     font-size: 0.85rem;
 }

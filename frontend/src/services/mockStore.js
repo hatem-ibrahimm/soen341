@@ -358,7 +358,12 @@ export function resetDb() {
 
 export function ensureDemoSession() {
     if (!getToken() || getToken() === 'mock-token') {
-        saveSession('mock-token', DEMO_USER_ID, 'recruiter', 'Northwind Labs')
+        saveSession(
+            'mock-token',
+            DEMO_USER_ID,
+            'recruiter',
+            'Northwind Labs',
+        )
     }
 }
 

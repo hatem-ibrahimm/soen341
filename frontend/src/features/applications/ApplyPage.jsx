@@ -84,7 +84,7 @@ export default function ApplyPage() {
         }
     }
 
-    if (loadError) return <Alert tone="error">{loadError} <Link to="/jobs">Back to jobs</Link></Alert>
+    if (loadError) return <Alert tone="error">{loadError} <Link to="/jobs">Jobs Listings</Link></Alert>
     if (!job) return <p className={styles.muted}>Loading job…</p>
 
     const change = (e) => setEdits({ ...edits, [e.target.name]: e.target.value })
@@ -92,7 +92,7 @@ export default function ApplyPage() {
     return (
         <div className={styles.applyLayout}>
             <div>
-                <Link to="/jobs" className={styles.back}>← Back to jobs</Link>
+                <Link to="/jobs" className={styles.back}>← Jobs Listings</Link>
                 <h1 className={styles.pageTitle}>Apply to {job.company}</h1>
 
                 {existing ? (
@@ -101,7 +101,7 @@ export default function ApplyPage() {
                             You already applied to this job on {formatDate(existing.applied_at)}. Current status: <strong>{existing.status}</strong>.
                         </Alert>
                         <div style={{ marginTop: 14 }}>
-                            <Link to={`/applications?highlight=${existing.id}`} className={styles.primaryLink}>Track this application</Link>
+                            <Link to={`/applications?highlight=${existing.id}`} className={styles.primaryLink}>My Applications</Link>
                         </div>
                     </Card>
                 ) : (

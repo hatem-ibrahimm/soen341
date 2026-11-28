@@ -63,8 +63,8 @@ export default function ApplicationSubmittedPage() {
                 </dl>
 
                 <div className={styles.confirmActions}>
-                    <Link to={`/applications?highlight=${app.id}`} className={styles.primaryLink}>Track my applications</Link>
-                    <Link to="/jobs" className={styles.secondaryLink}>Browse more jobs</Link>
+                    <Link to={`/applications?highlight=${app.id}`} className={styles.primaryLink}>My Applications</Link>
+                    <Link to="/jobs" className={styles.secondaryLink}>Jobs Listings</Link>
                 </div>
             </div>
         </div>

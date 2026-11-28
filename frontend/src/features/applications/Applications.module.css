@@ -9,7 +9,7 @@
 }
 .primaryLink { background: var(--cc-primary); color: #fff; }
 .primaryLink:hover { background: var(--cc-primary-hover); }
-.secondaryLink { border: 1px solid var(--cc-border-strong); color: var(--cc-primary); }
+.secondaryLink { border: 1px solid var(--cc-border-strong); color: var(--cc-primary); background: var(--cc-surface); }
 .secondaryLink:hover { background: var(--cc-primary-soft); }
 
 /* Apply page */
@@ -110,10 +110,11 @@
 .trackerWrap { margin: 16px 0 6px; padding-left: 62px; }
 @media (max-width: 520px) { .trackerWrap { padding-left: 0; } }
 .detailsToggle {
-  margin-left: 62px; border: 0; background: none; padding: 4px 0; cursor: pointer;
+  border: 0; background: none; padding: 4px 0; cursor: pointer;
   color: var(--cc-primary); font-weight: 600; font-size: 0.85rem;
 }
-@media (max-width: 520px) { .detailsToggle { margin-left: 0; } }
+.appFooter { margin: 8px 0 0 62px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+@media (max-width: 520px) { .appFooter { margin-left: 0; } }
 .details {
   margin: 10px 0 0 62px; padding: 14px 16px; border-radius: var(--cc-radius-sm); background: var(--cc-bg);
   display: grid; grid-template-columns: 1fr 1.3fr; gap: 20px;

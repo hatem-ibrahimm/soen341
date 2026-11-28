@@ -20,9 +20,9 @@ MAX_OFFSET = 100_000
 DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}\Z")
 
 
-def _authenticated_applicant_id(get_current_user):
+def _authenticated_applicant_id(get_current_user, authenticated_user=None):
     """Return the canonical Supabase UUID, or None if the token is invalid."""
-    user = get_current_user()
+    user = authenticated_user if authenticated_user is not None else get_current_user()
     if user is None:
         return None, None
     try:
@@ -117,9 +117,18 @@ def _activity_record(row):
 def register_application_history_routes(app, get_connection, get_current_user):
     """Register the two read-only applicant-scoped history endpoints."""
 
+    def require_job_seeker():
+        user = get_current_user()
+        if user is None:
+            return None, (jsonify({"error": "Authentication required."}), 401)
+        return user, None
+
     @app.get("/api/analytics/applications/history")
     def get_my_application_history():
-        applicant_id, error = _authenticated_applicant_id(get_current_user)
+        user, error = require_job_seeker()
+        if error:
+            return error
+        applicant_id, error = _authenticated_applicant_id(get_current_user, user)
         if applicant_id is None:
             if error:
                 app.logger.error("Authenticated user ID is not a valid UUID")
@@ -186,7 +195,10 @@ def register_application_history_routes(app, get_connection, get_current_user):
 
     @app.get("/api/analytics/applications/activity")
     def get_my_application_activity():
-        applicant_id, error = _authenticated_applicant_id(get_current_user)
+        user, error = require_job_seeker()
+        if error:
+            return error
+        applicant_id, error = _authenticated_applicant_id(get_current_user, user)
         if applicant_id is None:
             if error:
                 app.logger.error("Authenticated user ID is not a valid UUID")

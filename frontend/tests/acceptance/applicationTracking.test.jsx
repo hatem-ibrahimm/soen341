@@ -2,6 +2,7 @@
 // "Track application status (Applied, Under Review, Interview, Offered, Rejected)."
 import { screen } from '@testing-library/react'
 import { renderApp } from '../renderApp.jsx'
+import { saveSession } from '../../src/services/session.js'
 
 const cardTitles = () => screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
 
@@ -9,7 +10,7 @@ describe('Tracking my applications', () => {
     test('every application is listed with a count per status', async () => {
         renderApp('/applications')
 
-        expect(await screen.findByRole('heading', { level: 1, name: 'My applications' })).toBeInTheDocument()
+        expect(await screen.findByRole('heading', { level: 1, name: 'My Applications' })).toBeInTheDocument()
         expect(await screen.findByRole('tab', { name: /13\s*All/ })).toBeInTheDocument()
         expect(screen.getByRole('tab', { name: /4\s*Applied/ })).toBeInTheDocument()
         expect(screen.getByRole('tab', { name: /2\s*Under Review/ })).toBeInTheDocument()
@@ -34,5 +35,17 @@ describe('Tracking my applications', () => {
         for (const step of ['Applied', 'Under Review', 'Interview', 'Offered']) {
             expect(screen.getAllByText(step).length).toBeGreaterThan(0)
         }
+    })
+
+    test('job seekers can open interview coordination from an interview application', async () => {
+        saveSession('job-seeker-token', '00000000-0000-4000-8000-000000000001', 'job_seeker')
+        const { user } = renderApp('/applications')
+
+        const interviewLinks = await screen.findAllByRole('link', { name: 'Coordinate interview' })
+        await user.click(interviewLinks[0])
+
+        expect(await screen.findByRole('heading', { level: 1, name: 'Interview scheduling' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Suggested times' })).toBeInTheDocument()
+        expect(screen.getByRole('heading', { name: 'Chat' })).toBeInTheDocument()
     })
 })

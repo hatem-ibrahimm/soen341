@@ -25,10 +25,6 @@ export default function ApplicationCard({ app, resumeName, highlighted }) {
                 <StatusTracker status={app.status} history={app.status_history} />
             </div>
 
-            <button className={styles.detailsToggle} onClick={() => setOpen((o) => !o)} aria-expanded={open}>
-                {open ? 'Hide details ▲' : 'Show details ▼'}
-            </button>
-
             {open && (
                 <div className={styles.details}>
                     <div>
@@ -86,6 +82,19 @@ export default function ApplicationCard({ app, resumeName, highlighted }) {
                     )}
                 </div>
             )}
+            <div className={styles.appFooter}>
+                <button className={styles.detailsToggle} onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+                    {open ? 'Hide details ▲' : 'Show details ▼'}
+                </button>
+                {app.status === 'Interview' && (
+                    <Link
+                        to={`/applications/${encodeURIComponent(app.id)}/interview`}
+                        className={styles.primaryLink}
+                    >
+                        Coordinate interview
+                    </Link>
+                )}
+            </div>
         </li>
     )
 }

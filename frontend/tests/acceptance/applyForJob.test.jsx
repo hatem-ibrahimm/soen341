@@ -34,19 +34,19 @@ describe('Applying for a job', () => {
         // Confirmation page
         expect(await screen.findByRole('heading', { name: 'Application submitted!' })).toBeInTheDocument()
 
-        // It now appears in "My applications": 13 sample applications + this one,
+        // It now appears in "My Applications": 13 sample applications + this one,
         // and one more in the "Applied" status
-        await user.click(screen.getByRole('link', { name: 'Track my applications' }))
+        await user.click(screen.getAllByRole('link', { name: 'My Applications' }).find((link) => link.getAttribute('href')?.startsWith('/applications?highlight=')))
         expect(await screen.findByRole('heading', { level: 3, name: 'Junior Frontend Developer' })).toBeInTheDocument()
         expect(screen.getByRole('tab', { name: /14\s*All/ })).toBeInTheDocument()
         expect(screen.getByRole('tab', { name: /5\s*Applied/ })).toBeInTheDocument()
     })
 
-    test('a job already applied to shows "Applied" instead of "Apply"', async () => {
+    test('a job already applied to shows "My Applications" instead of "Apply"', async () => {
         renderApp('/jobs')
         const card = (await screen.findByRole('heading', { level: 2, name: 'React Developer' })).closest('li')
 
-        expect(within(card).getByRole('link', { name: /Applied/ })).toBeInTheDocument()
+        expect(within(card).getByRole('link', { name: 'My Applications' })).toBeInTheDocument()
         expect(within(card).queryByRole('link', { name: 'Apply' })).not.toBeInTheDocument()
     })
 })

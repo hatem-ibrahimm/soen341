@@ -1,19 +1,47 @@
 // Acceptance tests: Job Search and Job Listing
 // "Display available job opportunities, search and filter them by keyword,
 //  location or category, and view detailed job descriptions."
-import { screen, within } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
+import { afterEach, vi } from 'vitest'
+import * as applicationApi from '../../src/services/applicationApi.js'
+import * as jobsApi from '../../src/services/jobsApi.js'
 import { renderApp } from '../renderApp.jsx'
 
 const jobTitles = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
 
 describe('Job search and job listing', () => {
+    afterEach(() => {
+        vi.restoreAllMocks()
+    })
+
     test('a job seeker sees the list of available jobs', async () => {
         renderApp('/jobs')
 
-        expect(await screen.findByRole('heading', { name: 'Find jobs' })).toBeInTheDocument()
+        expect(await screen.findByRole('heading', { name: 'Jobs Listings' })).toBeInTheDocument()
         expect(await screen.findByText('15 job(s) found.')).toBeInTheDocument()
         expect(jobTitles()).toContain('Junior Frontend Developer')
         expect(jobTitles()).toContain('UX Designer')
+    })
+
+    test('job listings remain visible when application statuses fail to load', async () => {
+        vi.spyOn(applicationApi, 'listMyApplications').mockRejectedValue(
+            new Error('Unable to retrieve applications.'),
+        )
+        renderApp('/jobs')
+
+        expect(await screen.findByRole('heading', { level: 2, name: 'Junior Frontend Developer' })).toBeInTheDocument()
+        expect(await screen.findByText(/Application statuses are unavailable/)).toBeInTheDocument()
+    })
+
+    test('job listings refresh when the page regains focus', async () => {
+        const listJobs = vi.spyOn(jobsApi, 'listJobs')
+        renderApp('/jobs')
+        await screen.findByText('15 job(s) found.')
+        expect(listJobs).toHaveBeenCalledTimes(1)
+
+        window.dispatchEvent(new Event('focus'))
+
+        await waitFor(() => expect(listJobs).toHaveBeenCalledTimes(2))
     })
 
     test('searching by keyword only shows matching jobs', async () => {

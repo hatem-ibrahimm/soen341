@@ -58,7 +58,7 @@ export default function AnalyticsDashboardPage() {
                 <EmptyState
                     icon="▁▃▅"
                     title="Nothing to chart yet"
-                    action={<Link to="/jobs" className={styles.primaryLink}>Browse jobs</Link>}
+                    action={<Link to="/jobs" className={styles.secondaryLink}>Jobs Listings</Link>}
                 >
                     Once you apply to a job, this page shows how your applications are doing and how
                     active you’ve been each week.
@@ -77,7 +77,7 @@ export default function AnalyticsDashboardPage() {
                     <h1 className={styles.title}>Your job search, so far</h1>
                     <p className={styles.subtitle}>Since {formatDate(facts.first)}</p>
                 </div>
-                <Link to="/applications" className={styles.secondaryLink}>Open my applications</Link>
+                <Link to="/applications" className={styles.secondaryLink}>My Applications</Link>
             </div>
 
             <section className={styles.overview} aria-label="Summary">

@@ -10,7 +10,6 @@ import {
 } from '../services/recruiterApi.js'
 import {
     listRecruiterInterviews,
-    scheduleRecruiterInterview,
     updateRecruiterInterview,
 } from '../services/interviewsApi.js'
 
@@ -24,8 +23,6 @@ export default function RecruiterApplicants({ job }) {
     const [selectedId, setSelectedId] = useState(null)
     const [details, setDetails] = useState(null)
     const [interviews, setInterviews] = useState([])
-    const [interviewDraft, setInterviewDraft] = useState({ scheduled_at: '', location: '', notes: '' })
-    const [savingInterview, setSavingInterview] = useState(false)
     const [updatingInterviewId, setUpdatingInterviewId] = useState(null)
     const [detailLoading, setDetailLoading] = useState(false)
     const [resumeLoadingId, setResumeLoadingId] = useState(null)
@@ -130,26 +127,6 @@ export default function RecruiterApplicants({ job }) {
         }
     }
 
-    async function scheduleInterview(event, applicationId) {
-        event.preventDefault()
-        setSavingInterview(true)
-        setActionError('')
-        setNotice('')
-        try {
-            const created = await scheduleRecruiterInterview(applicationId, {
-                ...interviewDraft,
-                scheduled_at: new Date(interviewDraft.scheduled_at).toISOString(),
-            })
-            setInterviews((current) => [...current, created])
-            setInterviewDraft({ scheduled_at: '', location: '', notes: '' })
-            setNotice('Interview scheduled. The applicant has been notified.')
-        } catch (requestError) {
-            setActionError(requestError.message || 'Unable to schedule the interview.')
-        } finally {
-            setSavingInterview(false)
-        }
-    }
-
     async function updateInterviewStatus(applicationId, interviewId, status) {
         setUpdatingInterviewId(interviewId)
         setActionError('')
@@ -232,34 +209,46 @@ export default function RecruiterApplicants({ job }) {
                                                 <small>Applied {formatDate(application.submitted_at)}</small>
                                             </div>
                                             <div className="recruiter-applicant-actions">
-                                                <Link
-                                                    className="recruiter-secondary-button"
-                                                    to={`/recruiter/applications/${encodeURIComponent(application.id)}/profile`}
-                                                >
-                                                    View full profile
-                                                </Link>
-                                                <button
-                                                    type="button"
-                                                    className="recruiter-text-button"
-                                                    aria-expanded={selectedId === application.id}
-                                                    onClick={() => toggleDetails(application.id)}
-                                                >
-                                                    {selectedId === application.id ? 'Hide review' : 'Review'}
-                                                </button>
+                                                <div className="recruiter-applicant-action-row">
+                                                    <Link
+                                                        className="recruiter-secondary-button"
+                                                        to={`/recruiter/applications/${encodeURIComponent(application.id)}/profile`}
+                                                    >
+                                                        View full profile
+                                                    </Link>
+                                                    <button
+                                                        type="button"
+                                                        className="recruiter-secondary-button"
+                                                        aria-expanded={selectedId === application.id}
+                                                        onClick={() => toggleDetails(application.id)}
+                                                    >
+                                                        {selectedId === application.id ? 'Hide review' : 'Review'}
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
-                                        <label className="recruiter-applicant-status">
-                                            Application status
-                                            <select
-                                                value={application.status}
-                                                disabled={updatingId === application.id}
-                                                onChange={(event) => updateStatus(application.id, event.target.value)}
-                                            >
-                                                {APPLICATION_STATUSES.map((status) => (
-                                                    <option key={status} value={status}>{status}</option>
-                                                ))}
-                                            </select>
-                                        </label>
+                                        <div className="recruiter-applicant-status-row">
+                                            <label className="recruiter-applicant-status">
+                                                Application status
+                                                <select
+                                                    value={application.status}
+                                                    disabled={updatingId === application.id}
+                                                    onChange={(event) => updateStatus(application.id, event.target.value)}
+                                                >
+                                                    {APPLICATION_STATUSES.map((status) => (
+                                                        <option key={status} value={status}>{status}</option>
+                                                    ))}
+                                                </select>
+                                            </label>
+                                            {application.status === 'Interview' && (
+                                                <Link
+                                                    className="recruiter-coordinate-link"
+                                                    to={`/applications/${encodeURIComponent(application.id)}/interview`}
+                                                >
+                                                    Coordinate interview
+                                                </Link>
+                                            )}
+                                        </div>
                                         {selectedId === application.id && (
                                             <div className="recruiter-applicant-details">
                                                 {detailLoading ? (
@@ -332,53 +321,6 @@ export default function RecruiterApplicants({ job }) {
                                                         ) : (
                                                             <p>No interviews scheduled.</p>
                                                         )}
-                                                        <form
-                                                            className="recruiter-interview-form"
-                                                            onSubmit={(event) => scheduleInterview(event, application.id)}
-                                                        >
-                                                            <label>
-                                                                Schedule date and time
-                                                                <input
-                                                                    type="datetime-local"
-                                                                    required
-                                                                    value={interviewDraft.scheduled_at}
-                                                                    onChange={(event) => setInterviewDraft((current) => ({
-                                                                        ...current,
-                                                                        scheduled_at: event.target.value,
-                                                                    }))}
-                                                                />
-                                                            </label>
-                                                            <label>
-                                                                Location or meeting link
-                                                                <input
-                                                                    type="text"
-                                                                    maxLength={500}
-                                                                    value={interviewDraft.location}
-                                                                    onChange={(event) => setInterviewDraft((current) => ({
-                                                                        ...current,
-                                                                        location: event.target.value,
-                                                                    }))}
-                                                                />
-                                                            </label>
-                                                            <label>
-                                                                Notes
-                                                                <textarea
-                                                                    maxLength={2000}
-                                                                    value={interviewDraft.notes}
-                                                                    onChange={(event) => setInterviewDraft((current) => ({
-                                                                        ...current,
-                                                                        notes: event.target.value,
-                                                                    }))}
-                                                                />
-                                                            </label>
-                                                            <button
-                                                                type="submit"
-                                                                className="recruiter-secondary-button"
-                                                                disabled={savingInterview}
-                                                            >
-                                                                {savingInterview ? 'Scheduling…' : 'Schedule interview'}
-                                                            </button>
-                                                        </form>
                                                     </>
                                                 ) : null}
                                             </div>

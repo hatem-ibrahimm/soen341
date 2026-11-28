@@ -1518,10 +1518,13 @@ def create_app(test_config=None):
 
     if __package__:
         from .interviews import register_interview_routes
+        from .interview_coordination import register_interview_coordination_routes
     else:
         from interviews import register_interview_routes
+        from interview_coordination import register_interview_coordination_routes
 
     register_interview_routes(app, get_connection, get_current_user)
+    register_interview_coordination_routes(app, get_connection, get_current_user)
 
     # Sprint 3 Issue #79: job seeker application analytics.
     if __package__:

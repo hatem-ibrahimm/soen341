@@ -157,19 +157,31 @@ export default function JobsPlaceholderPage() {
         jobs: [],
         appliedIds: new Set(),
         message: '',
+        applicationError: '',
     })
 
     useEffect(() => {
         let active = true
 
-        Promise.all([listJobs(), listMyApplications()])
-            .then(([jobs, applications]) => {
+        Promise.allSettled([listJobs(), listMyApplications()])
+            .then(([jobsResult, applicationsResult]) => {
                 if (!active) return
+
+                if (jobsResult.status === 'rejected') {
+                    throw jobsResult.reason
+                }
+
+                const applications = applicationsResult.status === 'fulfilled'
+                    ? applicationsResult.value
+                    : []
                 setResult({
                     status: 'success',
-                    jobs,
+                    jobs: jobsResult.value,
                     appliedIds: new Set(applications.map((application) => String(application.job_id))),
                     message: '',
+                    applicationError: applicationsResult.status === 'rejected'
+                        ? applicationsResult.reason.message || 'Unable to load application statuses.'
+                        : '',
                 })
             })
             .catch((error) => {
@@ -179,6 +191,7 @@ export default function JobsPlaceholderPage() {
                     jobs: [],
                     appliedIds: new Set(),
                     message: error.message || 'Unable to load jobs.',
+                    applicationError: '',
                 })
             })
 
@@ -186,6 +199,15 @@ export default function JobsPlaceholderPage() {
             active = false
         }
     }, [retryCount])
+
+    useEffect(() => {
+        function refreshJobs() {
+            setRetryCount((count) => count + 1)
+        }
+
+        window.addEventListener('focus', refreshJobs)
+        return () => window.removeEventListener('focus', refreshJobs)
+    }, [])
 
     const filteredJobs = result.jobs.filter((job) => matchesFilters(job, filters))
 
@@ -202,7 +224,7 @@ export default function JobsPlaceholderPage() {
 
     return (
         <div className={styles.wrap}>
-            <h1 className={styles.h1}>Find jobs</h1>
+            <h1 className={styles.h1}>Jobs Listings</h1>
             <SearchForm key={query} query={query} onSearch={search} onClear={clear} />
 
             {result.status === 'loading' && <p role="status">Loading jobs…</p>}
@@ -217,6 +239,12 @@ export default function JobsPlaceholderPage() {
 
             {result.status === 'success' && (
                 <Card className={styles.listCard}>
+                    {result.applicationError && (
+                        <Alert tone="info">
+                            Application statuses are unavailable: {result.applicationError}
+                            Job listings are still shown.
+                        </Alert>
+                    )}
                     <p className={styles.resultCount} role="status">
                         {filteredJobs.length
                             ? `${filteredJobs.length} job(s) found.`
@@ -268,7 +296,7 @@ export default function JobsPlaceholderPage() {
                                     </div>
                                     {applied ? (
                                         <Link to="/applications" className={styles.applied}>
-                                            ✓ Applied
+                                            My Applications
                                         </Link>
                                     ) : (
                                         <Link to={`/jobs/${encodeURIComponent(job.id)}/apply`} className={styles.apply}>

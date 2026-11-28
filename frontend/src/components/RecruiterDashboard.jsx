@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
     createJobListing,
+    deleteJobListing,
     listRecruiterJobs,
     updateJobListing,
 } from '../services/recruiterApi.js'
 import RecruiterApplicants from './RecruiterApplicants.jsx'
 import { getCompanyName } from '../services/session.js'
+import { formatJobSalary } from '../services/jobApi.js'
 import './RecruiterDashboard.css'
 
 const EMPTY_FORM = {
@@ -18,7 +20,7 @@ const EMPTY_FORM = {
     min_salary: '',
     max_salary: '',
     application_deadline: '',
-    status: 'draft',
+    status: 'published',
 }
 
 function emptyForm() {
@@ -54,6 +56,8 @@ function RecruiterDashboard() {
     const [isSaving, setIsSaving] = useState(false)
     const [closingJobId, setClosingJobId] = useState(null)
     const [postingsQuery, setPostingsQuery] = useState('')
+    const [isPostingsOpen, setIsPostingsOpen] = useState(true)
+    const [isArchivedOpen, setIsArchivedOpen] = useState(true)
 
     useEffect(() => {
         let active = true
@@ -247,6 +251,55 @@ function RecruiterDashboard() {
         setIsFormOpen(true)
     }
 
+    function reuseArchivedJob(job) {
+        setEditingJob(null)
+        setForm({
+            ...formFromJob(job),
+            status: 'draft',
+        })
+        setSkillDraft('')
+        setFormError('')
+        setNotice('')
+        setIsFormOpen(true)
+        window.requestAnimationFrame(() => {
+            document.getElementById('posting-form-heading')?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start',
+            })
+        })
+    }
+
+    function clearJobForm() {
+        setEditingJob(null)
+        setForm(emptyForm())
+        setSkillDraft('')
+        setFormError('')
+        setNotice('')
+    }
+
+    async function deleteArchivedJob(job) {
+        if (!window.confirm(
+            `Delete "${job.title}" permanently? This will also delete all applications and data associated with it.`,
+        )) {
+            return
+        }
+
+        setClosingJobId(job.id)
+        setLoadError('')
+        setNotice('')
+        try {
+            await deleteJobListing(job.id)
+            setJobs((current) =>
+                current.filter((item) => String(item.id) !== String(job.id)),
+            )
+            setNotice('The archived job listing and its associated data have been deleted.')
+        } catch (error) {
+            setLoadError(error.message || 'Unable to delete the archived job listing.')
+        } finally {
+            setClosingJobId(null)
+        }
+    }
+
     async function closeListing(job) {
         if (
             !window.confirm(
@@ -270,7 +323,7 @@ function RecruiterDashboard() {
                 setEditingJob(updated)
                 setForm(formFromJob(updated))
             }
-            setNotice('The job posting is closed. Existing applications remain unchanged.')
+            setNotice('Applications are closed for this job posting. Existing applications remain unchanged.')
         } catch (error) {
             setLoadError(error.message || 'Unable to close the job posting.')
         } finally {
@@ -304,26 +357,35 @@ function RecruiterDashboard() {
     const isEditing = Boolean(editingJob)
     const visibleJobs = useMemo(() => {
         const query = postingsQuery.trim().toLocaleLowerCase()
-        if (!query) return jobs
+        const activeJobs = jobs.filter((job) => (job.status ?? 'published') !== 'archived')
+        if (!query) return activeJobs
 
-        return jobs.filter((job) =>
+        return activeJobs.filter((job) =>
             [job.title, job.company_name ?? job.company, job.location, job.category]
                 .some((value) => value?.toLocaleLowerCase().includes(query)),
         )
     }, [jobs, postingsQuery])
+    const activeJobCount = useMemo(
+        () => jobs.filter((job) => (job.status ?? 'published') !== 'archived').length,
+        [jobs],
+    )
+    const archivedJobs = useMemo(
+        () => jobs.filter((job) => job.status === 'archived'),
+        [jobs],
+    )
 
     return (
         <div className="recruiter-dashboard">
             <header className="recruiter-heading">
                 <div>
                     <p className="recruiter-eyebrow">Recruiter workspace</p>
-                    <h1>Recruiter dashboard</h1>
+                    <h1>Recruiter Workspace</h1>
                     <p className="recruiter-intro">
                         Create and manage your job postings.
                     </p>
                 </div>
                 <div className="recruiter-count">
-                    <strong>{jobs.length}</strong>
+                    <strong>{activeJobCount}</strong>
                     <span>Your postings</span>
                 </div>
             </header>
@@ -555,6 +617,13 @@ function RecruiterDashboard() {
                                     Cancel
                                 </button>
                             )}
+                            <button
+                                type="button"
+                                className="recruiter-secondary-button"
+                                onClick={clearJobForm}
+                            >
+                                Clear All
+                            </button>
                             <button type="submit" disabled={isSaving}>
                                 {isSaving
                                     ? 'Saving…'
@@ -569,100 +638,211 @@ function RecruiterDashboard() {
                 </section>
 
                 <section className="recruiter-panel recruiter-postings-panel" aria-labelledby="your-postings-heading">
-                    <div className="recruiter-panel-heading">
-                        <div>
-                            <h2 id="your-postings-heading">Your job postings</h2>
-                            <p>Only postings managed by your recruiter account.</p>
+                    <div className={`recruiter-panel-heading${isPostingsOpen ? ' recruiter-panel-heading-open' : ''}`}>
+                        <button
+                            type="button"
+                            id="your-postings-heading"
+                            className="recruiter-form-toggle"
+                            aria-expanded={isPostingsOpen}
+                            aria-controls="active-job-postings"
+                            onClick={() => setIsPostingsOpen((open) => !open)}
+                        >
+                            <span>
+                                <strong>Your job postings</strong>
+                                {isPostingsOpen && (
+                                    <small>Only postings managed by your recruiter account.</small>
+                                )}
+                            </span>
+                            <span className="recruiter-form-toggle-icon" aria-hidden="true">
+                                {isPostingsOpen ? '−' : '+'}
+                            </span>
+                        </button>
+                    </div>
+
+                    <div id="active-job-postings" hidden={!isPostingsOpen}>
+                        <div className="recruiter-postings-search">
+                            <input
+                                type="search"
+                                placeholder="Search by job title or company"
+                                value={postingsQuery}
+                                onChange={(event) => setPostingsQuery(event.target.value)}
+                                aria-label="Search job postings"
+                            />
                         </div>
-                    </div>
 
-                    <div className="recruiter-postings-search">
-                        <input
-                            type="search"
-                            placeholder="Search by job title or company"
-                            value={postingsQuery}
-                            onChange={(event) => setPostingsQuery(event.target.value)}
-                            aria-label="Search job postings"
-                        />
+                        {loading ? (
+                            <p className="recruiter-empty" role="status">Loading your postings…</p>
+                        ) : activeJobCount ? (
+                            <div className="recruiter-postings-scroll">
+                                <ul className="recruiter-listings">
+                                    {visibleJobs.map((job) => {
+                                        const status = job.status ?? 'published'
+                                        const isClosing = String(closingJobId) === String(job.id)
+                                        return (
+                                            <li key={job.id} className="recruiter-listing">
+                                                <div className="recruiter-listing-title-row">
+                                                    <h3>{job.title}</h3>
+                                                    <span className={`recruiter-status recruiter-status-${status}`}>
+                                                        {status}
+                                                    </span>
+                                                </div>
+                                                <p>{job.company_name ?? job.company}</p>
+                                                <p className="recruiter-listing-meta">
+                                                    {job.location} · {job.category}
+                                                </p>
+                                                {job.salary && (
+                                                    <p className="recruiter-listing-meta">{job.salary}</p>
+                                                )}
+                                                {job.application_deadline && (
+                                                    <p className="recruiter-listing-meta">
+                                                        Apply by {job.application_deadline}
+                                                    </p>
+                                                )}
+                                                {job.required_skills?.length > 0 && (
+                                                    <p className="recruiter-listing-meta">
+                                                        Skills: {job.required_skills.join(', ')}
+                                                    </p>
+                                                )}
+                                                <div className="recruiter-listing-actions">
+                                                    <button
+                                                        type="button"
+                                                        className="recruiter-secondary-button"
+                                                        onClick={() => startEdit(job)}
+                                                    >
+                                                        Edit
+                                                    </button>
+                                                    {status !== 'closed' && (
+                                                        <button
+                                                            type="button"
+                                                            className="recruiter-close-button"
+                                                            disabled={isClosing}
+                                                            onClick={() => closeListing(job)}
+                                                        >
+                                                            {isClosing ? 'Closing applications…' : 'Close applications'}
+                                                        </button>
+                                                    )}
+                                                    {status !== 'archived' && (
+                                                        <button
+                                                            type="button"
+                                                            className="recruiter-secondary-button"
+                                                            disabled={isClosing}
+                                                            onClick={() => archiveListing(job)}
+                                                        >
+                                                            {isClosing ? 'Archiving…' : 'Archive'}
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <RecruiterApplicants job={job} />
+                                            </li>
+                                        )
+                                    })}
+                                    {visibleJobs.length === 0 && (
+                                        <li className="recruiter-empty" role="status">
+                                            No postings match your search.
+                                        </li>
+                                    )}
+                                </ul>
+                            </div>
+                        ) : loadError ? null : (
+                            <p className="recruiter-empty" role="status">
+                                You have no active job postings. Create a draft or publish an opening.
+                            </p>
+                        )}
                     </div>
+                </section>
 
-                    {loading ? (
-                        <p className="recruiter-empty" role="status">Loading your postings…</p>
-                    ) : jobs.length ? (
-                        <ul className="recruiter-listings">
-                            {visibleJobs.map((job) => {
-                                const status = job.status ?? 'published'
-                                const isClosing = String(closingJobId) === String(job.id)
-                                return (
-                                    <li key={job.id} className="recruiter-listing">
-                                        <div className="recruiter-listing-title-row">
-                                            <h3>{job.title}</h3>
-                                            <span className={`recruiter-status recruiter-status-${status}`}>
-                                                {status}
-                                            </span>
-                                        </div>
-                                        <p>{job.company_name ?? job.company}</p>
-                                        <p className="recruiter-listing-meta">
-                                            {job.location} · {job.category}
-                                        </p>
-                                        {job.salary && (
-                                            <p className="recruiter-listing-meta">{job.salary}</p>
-                                        )}
-                                        {job.application_deadline && (
-                                            <p className="recruiter-listing-meta">
-                                                Apply by {job.application_deadline}
-                                            </p>
-                                        )}
-                                        {job.required_skills?.length > 0 && (
-                                            <p className="recruiter-listing-meta">
-                                                Skills: {job.required_skills.join(', ')}
-                                            </p>
-                                        )}
-                                        <div className="recruiter-listing-actions">
-                                            <button
-                                                type="button"
-                                                className="recruiter-secondary-button"
-                                                onClick={() => startEdit(job)}
-                                            >
-                                                Edit
-                                            </button>
-                                            {status !== 'closed' && (
-                                                <button
-                                                    type="button"
-                                                    className="recruiter-close-button"
-                                                    disabled={isClosing}
-                                                    onClick={() => closeListing(job)}
-                                                >
-                                                    {isClosing ? 'Closing…' : 'Close posting'}
-                                                </button>
+                {archivedJobs.length > 0 && (
+                    <section className="recruiter-panel recruiter-postings-panel" aria-labelledby="archived-listings-heading">
+                        <div className={`recruiter-panel-heading${isArchivedOpen ? ' recruiter-panel-heading-open' : ''}`}>
+                            <button
+                                type="button"
+                                id="archived-listings-heading"
+                                className="recruiter-form-toggle"
+                                aria-expanded={isArchivedOpen}
+                                aria-controls="archived-job-postings"
+                                onClick={() => setIsArchivedOpen((open) => !open)}
+                            >
+                                <span>
+                                    <strong>Archived listings</strong>
+                                    {isArchivedOpen && (
+                                        <small>Postings hidden from job search and kept for your records.</small>
+                                    )}
+                                </span>
+                                <span className="recruiter-form-toggle-icon" aria-hidden="true">
+                                    {isArchivedOpen ? '−' : '+'}
+                                </span>
+                            </button>
+                        </div>
+
+                        <div id="archived-job-postings" hidden={!isArchivedOpen}>
+                            <div className="recruiter-postings-scroll">
+                                <ul className="recruiter-listings">
+                                    {archivedJobs.map((job) => (
+                                        <li key={job.id} className="recruiter-archived-item">
+                                            <div className="recruiter-listing-title-row">
+                                                <h3>{job.title}</h3>
+                                                <span className="recruiter-status recruiter-status-archived">
+                                                    Archived
+                                                </span>
+                                            </div>
+                                            <p><strong>{job.company_name ?? job.company}</strong></p>
+                                            <dl className="recruiter-listing-summary">
+                                                <div>
+                                                    <dt>Location</dt>
+                                                    <dd>{job.location}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt>Category</dt>
+                                                    <dd>{job.category}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt>Salary</dt>
+                                                    <dd>{formatJobSalary(job)}</dd>
+                                                </div>
+                                            </dl>
+                                            {job.application_deadline && (
+                                                <p className="recruiter-listing-meta">
+                                                    Apply by {job.application_deadline}
+                                                </p>
                                             )}
-                                            {status !== 'archived' && (
+                                            <h4>Required skills</h4>
+                                            {job.required_skills?.length > 0 ? (
+                                                <ul className="recruiter-listing-skills">
+                                                    {job.required_skills.map((skill) => (
+                                                        <li key={skill}>{skill}</li>
+                                                    ))}
+                                                </ul>
+                                            ) : (
+                                                <p className="recruiter-listing-meta">
+                                                    Required skills not provided.
+                                                </p>
+                                            )}
+                                            <div className="recruiter-listing-actions">
                                                 <button
                                                     type="button"
                                                     className="recruiter-secondary-button"
-                                                    disabled={isClosing}
-                                                    onClick={() => archiveListing(job)}
+                                                    onClick={() => reuseArchivedJob(job)}
                                                 >
-                                                    {isClosing ? 'Archiving…' : 'Archive'}
+                                                    Reuse
                                                 </button>
-                                            )}
-                                        </div>
-                                        <RecruiterApplicants job={job} />
-                                    </li>
-                                )
-                            })}
-                            {visibleJobs.length === 0 && (
-                                <li className="recruiter-empty" role="status">
-                                    No postings match your search.
-                                </li>
-                            )}
-                        </ul>
-                    ) : loadError ? null : (
-                        <p className="recruiter-empty" role="status">
-                            You have no job postings yet. Create a draft or publish an opening.
-                        </p>
-                    )}
-                </section>
+                                                <button
+                                                    type="button"
+                                                    className="recruiter-close-button"
+                                                    disabled={String(closingJobId) === String(job.id)}
+                                                    onClick={() => deleteArchivedJob(job)}
+                                                >
+                                                    {String(closingJobId) === String(job.id)
+                                                        ? 'Deleting…'
+                                                        : 'Delete'}
+                                                </button>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+                    </section>
+                )}
             </div>
         </div>
     )

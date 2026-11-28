@@ -379,7 +379,7 @@ function RecruiterDashboard() {
             <header className="recruiter-heading">
                 <div>
                     <p className="recruiter-eyebrow">Recruiter workspace</p>
-                    <h1>Recruiter dashboard</h1>
+                    <h1>Recruiter Workspace</h1>
                     <p className="recruiter-intro">
                         Create and manage your job postings.
                     </p>

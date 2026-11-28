@@ -14,7 +14,7 @@ describe('Recruiter job postings', () => {
     test('a recruiter sees the postings they manage', async () => {
         renderApp('/recruiter')
 
-        expect(await screen.findByRole('heading', { level: 1, name: 'Recruiter dashboard' })).toBeInTheDocument()
+        expect(await screen.findByRole('heading', { level: 1, name: 'Recruiter Workspace' })).toBeInTheDocument()
         expect(await screen.findByRole('heading', { level: 3, name: 'Junior Frontend Developer' })).toBeInTheDocument()
     })
 

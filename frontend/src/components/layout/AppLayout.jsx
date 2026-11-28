@@ -4,12 +4,15 @@ import DemoBar from './DemoBar.jsx'
 import ProfileMenu from './ProfileMenu.jsx'
 import styles from './AppLayout.module.css'
 import { getUnreadNotificationCount } from '../../services/notificationsApi.js'
+import { getUserRole } from '../../services/session.js'
 
 // Top bar + page container shared by every logged-in page.
 export default function AppLayout() {
     const [unreadCount, setUnreadCount] = useState(null)
     const [unreadError, setUnreadError] = useState(false)
     const location = useLocation()
+    const role = getUserRole()
+    const isRecruiter = role === 'recruiter'
     const refreshUnreadCount = useCallback(() => {
         getUnreadNotificationCount()
             .then((count) => {
@@ -37,7 +40,7 @@ export default function AppLayout() {
         <div className={styles.shell}>
             <header className={styles.topbar}>
                 <div className={styles.inner}>
-                    <Link to="/jobs" className={styles.brand}>
+                    <Link to={isRecruiter ? '/recruiter' : '/jobs'} className={styles.brand}>
                         CareerConnect
                     </Link>
                     <nav className={styles.nav} aria-label="Main">
@@ -48,7 +51,7 @@ export default function AppLayout() {
                             My Applications
                         </NavLink>
                         <NavLink to="/dashboard" className={navClass}>
-                            Dashboard
+                            Job Dashboard
                         </NavLink>
                         <NavLink
                             to="/notifications"
@@ -67,9 +70,11 @@ export default function AppLayout() {
                                 </span>
                             )}
                         </NavLink>
-                        <NavLink to="/recruiter" className={navClass}>
-                            Recruiter dashboard
-                        </NavLink>
+                        {isRecruiter && (
+                            <NavLink to="/recruiter" className={navClass}>
+                                Recruiter Workspace
+                            </NavLink>
+                        )}
                     </nav>
                     <ProfileMenu />
                 </div>

@@ -74,7 +74,15 @@ def _recruiter_id(user, get_connection=None):
             "SELECT 1 FROM public.recruiters WHERE id = %s",
             (user_id,),
         )
-        return user_id if cursor.fetchone() is not None else None
+        row = cursor.fetchone()
+        if row is not None:
+            try:
+                row_values = tuple(row)
+                if len(row_values) == 1 and row_values[0] == 1:
+                    return user_id
+            except (TypeError, IndexError):
+                return None
+        return None
     finally:
         if cursor is not None:
             cursor.close()

@@ -41,7 +41,6 @@ def register_application_analytics_routes(app, get_connection, get_current_user)
         user = get_current_user()
         if user is None:
             return jsonify({"error": "Authentication required."}), 401
-
         try:
             applicant_id = str(uuid.UUID(str(user.id)))
         except (AttributeError, TypeError, ValueError):

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCurrentUser } from '../../context/CurrentUserContext.jsx'
-import { clearSession } from '../../services/session.js'
+import { clearSession, getUserRole } from '../../services/session.js'
 import Avatar from '../common/Avatar.jsx'
 import styles from './ProfileMenu.module.css'
 
@@ -27,6 +27,7 @@ export default function ProfileMenu() {
     const first = user?.first_name ?? ''
     const last = user?.last_name ?? ''
     const close = () => setOpen(false)
+    const isRecruiter = getUserRole() === 'recruiter'
 
     return (
         <div className={styles.wrap} ref={ref}>
@@ -47,10 +48,15 @@ export default function ProfileMenu() {
                         <span>{user?.email}</span>
                     </div>
                     <Link to="/profile" role="menuitem" onClick={close}>My profile</Link>
-                    <Link to="/applications" role="menuitem" onClick={close}>My Applications</Link>
-                    <Link to="/dashboard" role="menuitem" onClick={close}>Application dashboard</Link>
                     <Link to="/resume-feedback" role="menuitem" onClick={close}>Resume feedback</Link>
+                    <hr />
                     <Link to="/jobs" role="menuitem" onClick={close}>Jobs Listings</Link>
+                    <Link to="/applications" role="menuitem" onClick={close}>My Applications</Link>
+                    <Link to="/dashboard" role="menuitem" onClick={close}>Job Dashboard</Link>
+                    <hr />
+                    {isRecruiter && (
+                        <Link to="/recruiter" role="menuitem" onClick={close}>Recruiter Workspace</Link>
+                    )}
                     <hr />
                     <button role="menuitem" className={styles.logout} onClick={logOut}>Log out</button>
                 </div>

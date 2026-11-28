@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import HomePage from './components/HomePage.jsx'
 import AppLayout from './components/layout/AppLayout.jsx'
 import RequireAuth from './components/layout/RequireAuth.jsx'
+import RequireRole from './components/layout/RequireRole.jsx'
 import LoginForm from './components/LoginForm.jsx'
 import RegistrationForm from './components/RegistrationForm.jsx'
 import RecruiterDashboard from './components/RecruiterDashboard.jsx'
@@ -47,22 +48,25 @@ function App() {
                     <Route
                         path="/recruiter"
                         element={
-                            getUserRole() === 'recruiter'
-                                ? <RecruiterDashboard />
-                                : <Navigate to="/jobs" replace />
+                            <RequireRole role="recruiter" redirectTo="/jobs">
+                                <RecruiterDashboard />
+                            </RequireRole>
                         }
                     />
                     <Route
                         path="/recruiter/applications/:applicationId/profile"
                         element={
-                            getUserRole() === 'recruiter'
-                                ? <RecruiterApplicantProfile />
-                                : <Navigate to="/jobs" replace />
+                            <RequireRole role="recruiter" redirectTo="/jobs">
+                                <RecruiterApplicantProfile />
+                            </RequireRole>
                         }
                     />
                     <Route path="/applications/:applicationId/submitted" element={<ApplicationSubmittedPage />} />
                     {/* Sprint 3 */}
-                    <Route path="/dashboard" element={<AnalyticsDashboardPage />} />
+                    <Route
+                        path="/dashboard"
+                        element={<AnalyticsDashboardPage />}
+                    />
                     <Route path="/resume-feedback" element={<ResumeFeedbackPage />} />
                 </Route>
             </Route>

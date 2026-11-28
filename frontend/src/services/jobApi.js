@@ -162,8 +162,10 @@ export function formatJobSalary(job) {
         currency: 'CAD',
         maximumFractionDigits: 0,
     })
-    const minimum = Number(job.salary_min)
-    const maximum = Number(job.salary_max)
+    // A missing salary can arrive as null; Number(null) would be 0 and show "$0".
+    const toAmount = (value) => (value === null || value === undefined || value === '' ? NaN : Number(value))
+    const minimum = toAmount(job.salary_min)
+    const maximum = toAmount(job.salary_max)
 
     if (Number.isFinite(minimum) && Number.isFinite(maximum)) {
         return `${formatter.format(minimum)}–${formatter.format(maximum)} / year`

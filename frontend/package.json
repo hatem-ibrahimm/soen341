@@ -8,6 +8,8 @@
     "build": "vite build",
     "lint": "oxlint",
     "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:acceptance": "vitest run tests/acceptance",
     "test:watch": "vitest",
     "preview": "vite preview",
     "dev:mock": "vite --mode mock"
